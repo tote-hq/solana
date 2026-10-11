@@ -3,12 +3,13 @@ import { beforeEach, describe, it } from 'node:test';
 
 import { ensureUserCookie, forgetUserCookie } from '../session-login.ts';
 
-const ADDRESS = 'GA' + 'B'.repeat(54);
+const ADDRESS = '5zeMdzZCXkCHbTwvoxtEHRHCP5fe7MLc4fHgG54ENhUD';
+const OTHER = '9TNtBk4RL2dmYdffqfudhLGc1DEtnHc8nmw7yWcD2ctc';
 
-/** A wallet that signs everything with a fixed stand-in signature. */
-const sign = async (_message: string) => 'c2lnbmVk';
-/** A wallet that will not sign: a passkey smart wallet, or a declined prompt. */
-const refuse = async (_message: string) => null;
+/** A live Privy session: the access token the server will verify. */
+const sign = async () => 'privy-access-token';
+/** Login dismissed, or Privy has no token yet. */
+const refuse = async () => null;
 
 /** Swap in a fetch that counts calls and resolves when we say so. */
 function stubFetch(reply: () => Promise<Response>) {
@@ -31,16 +32,15 @@ describe('ensureUserCookie', () => {
     const [a, b] = await Promise.all([ensureUserCookie(ADDRESS, sign), ensureUserCookie(ADDRESS, sign)]);
     assert.equal(calls.length, 1);
     assert.deepEqual([a, b], [true, true]);
-    assert.match(calls[0]!, /GAB/);
+    assert.equal(JSON.parse(calls[0]!).token, 'privy-access-token');
   });
 
-  it('sends a login proof with the address, never the address alone', async () => {
+  it('sends the Privy token, never the address', async () => {
     const calls = stubFetch(ok);
     await ensureUserCookie(ADDRESS, sign);
-    const body = JSON.parse(calls[0]!) as { address: string; proof?: { message: string; signature: string } };
-    assert.equal(body.address, ADDRESS);
-    assert.equal(body.proof?.signature, 'c2lnbmVk');
-    assert.match(body.proof?.message ?? '', new RegExp(`^Changuito: iniciar sesión con ${ADDRESS} \\(`));
+    const body = JSON.parse(calls[0]!) as { token?: string; address?: string };
+    assert.equal(body.token, 'privy-access-token');
+    assert.equal(body.address, undefined);
   });
 
   it('does not call the server when the wallet will not sign', async () => {
@@ -71,7 +71,7 @@ describe('ensureUserCookie', () => {
   it('mints again for a different address', async () => {
     const calls = stubFetch(ok);
     await ensureUserCookie(ADDRESS, sign);
-    await ensureUserCookie('GC' + 'D'.repeat(54), sign);
+    await ensureUserCookie(OTHER, sign);
     assert.equal(calls.length, 2);
   });
 

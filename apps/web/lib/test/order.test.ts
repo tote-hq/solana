@@ -160,14 +160,18 @@ describe('openArgs', () => {
 });
 
 describe('RULE: the args match the contract they are sent to', () => {
-  it('open() still takes (buyer, order_id, amount, basket_hash, timeout_secs)', async () => {
-    // Soroban arguments are positional, and two of them are BytesN<32>. Swap
+  it('open() still takes (order_id, amount, basket_hash, timeout_secs)', async () => {
+    // Anchor arguments are positional after the accounts context. Swap
     // order_id and basket_hash and everything type-checks, deploys, and then
-    // settles against a basket nobody approved. Nothing else catches that, so
-    // this reads the signature out of the contract and compares it.
-    const src = await readFile(new URL('../../../../contracts/escrow/src/lib.rs', import.meta.url), 'utf8');
-    const sig = /pub fn open\(\s*env: Env,([^)]*)\)/.exec(src);
-    assert.ok(sig, 'could not find `pub fn open` in the escrow contract');
+    // settles against a basket nobody approved. The buyer is an account, not
+    // an argument. Nothing else catches a swapped pair, so this reads the
+    // signature out of the program and compares it.
+    const src = await readFile(
+      new URL('../../../../anchor/programs/changuito_escrow/src/lib.rs', import.meta.url),
+      'utf8',
+    );
+    const sig = /pub fn open\(\s*ctx: Context<Open>,([^)]*)\)/.exec(src);
+    assert.ok(sig, 'could not find `pub fn open` in the escrow program');
 
     const declared = sig[1]
       .split(',')
@@ -177,16 +181,15 @@ describe('RULE: the args match the contract they are sent to', () => {
 
     assert.deepEqual(
       declared.map(([name]) => name),
-      ['buyer', 'order_id', 'amount', 'basket_hash', 'timeout_secs'],
+      ['order_id', 'amount', 'basket_hash', 'timeout_secs'],
     );
 
-    // And the Rust types the encoder is claiming to satisfy.
     assert.deepEqual(
       declared.map(([, type]) => type),
-      ['Address', 'BytesN<32>', 'i128', 'BytesN<32>', 'u64'],
+      ['[u8; 32]', 'u64', '[u8; 32]', 'i64'],
     );
 
-    const bounds = /const MIN_TIMEOUT: u64 = (\d+);[\s\S]*?const MAX_TIMEOUT: u64 = ([^;]+);/.exec(src);
+    const bounds = /const MIN_TIMEOUT: i64 = (\d+);[\s\S]*?const MAX_TIMEOUT: i64 = ([^;]+);/.exec(src);
     assert.ok(bounds, 'could not find the timeout bounds');
     assert.equal(Number(bounds[1]), MIN_TIMEOUT_SECS);
     // `30 * 24 * 60 * 60` — evaluated rather than string-matched.

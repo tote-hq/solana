@@ -36,7 +36,7 @@ describe('the purchases page copy', () => {
 
   it('RULE: the way into the real mode says the same words as the masthead', () => {
     // Two different sentences for one crossing would read as two crossings.
-    assert.equal(PURCHASES.guestAction, 'Cambiar a modo real');
+    assert.equal(PURCHASES.guestAction, 'Iniciar sesión');
   });
 
   it('RULE: warns about the signature before asking for it', () => {

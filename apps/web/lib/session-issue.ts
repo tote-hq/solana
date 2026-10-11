@@ -11,11 +11,15 @@ import { isSolanaAddress } from './solana.ts';
  * address the cookie names is one Privy vouches for, not one the browser
  * claimed. Everything downstream (chat limits, checkout, orders) reads the
  * address from this cookie.
+ *
+ * `verify` is the Privy check. Tests pass their own so a suite does not
+ * dial auth.privy.io; production leaves it as the real one.
  */
 export async function issueUserSession(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
+  verify: typeof verifyPrivyToken = verifyPrivyToken,
 ): Promise<Response> {
   const gated = await requireHuman(req, env);
   if (gated) return gated;
@@ -41,7 +45,7 @@ export async function issueUserSession(
     return Response.json({ error: 'session_proof_required', message: 'Iniciá sesión de nuevo.' }, { status: 401 });
   }
 
-  const who = await verifyPrivyToken(token, env);
+  const who = await verify(token, env);
   if (!who) {
     return Response.json(
       { error: 'session_proof_invalid', message: 'No pudimos confirmar tu sesión. Iniciá sesión de nuevo.' },

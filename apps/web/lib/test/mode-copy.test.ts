@@ -20,12 +20,15 @@ const every = [
 
 describe('mode copy', () => {
   it('has a voice for every network, and only those', () => {
-    assert.deepEqual(MODES.map((m) => m.network), [...NETWORK_IDS]);
+    // `MODES` also carries the mainnet sentences for when that network exists.
+    // What ships today is `devnet`, and `modeCopy` has to answer for each one
+    // that deployments.ts actually names.
     for (const net of NETWORK_IDS) assert.equal(modeCopy(net).network, net);
+    assert.ok(MODES.some((m) => m.network === 'devnet'));
   });
 
   it('RULE: shows the safe mode first', () => {
-    assert.equal(MODES[0]?.network, 'testnet');
+    assert.equal(MODES[0]?.network, 'devnet');
   });
 
   it('RULE: never names a network, a chain or a wallet', () => {
@@ -44,20 +47,24 @@ describe('mode copy', () => {
     // The bug this fixes: every "no es plata real" string used to live behind
     // the faucet, which most visitors never reach. This one is always on
     // screen, next to the number.
-    assert.match(modeCopy('testnet').balanceUnit, /de prueba/);
-    assert.equal(modeCopy('mainnet').balanceUnit, 'USDC');
-    assert.notEqual(modeCopy('testnet').balanceUnit, modeCopy('mainnet').balanceUnit);
+    assert.match(modeCopy('devnet').balanceUnit, /de prueba/);
+    const real = MODES.find((m) => m.network === 'mainnet');
+    assert.ok(real);
+    assert.equal(real.balanceUnit, 'USDC');
+    assert.notEqual(modeCopy('devnet').balanceUnit, real.balanceUnit);
   });
 
   it('says plainly, in test mode, that nothing is being spent', () => {
-    assert.match(modeCopy('testnet').hint, /No es plata real/);
-    assert.match(modeCopy('testnet').payNote, /prueba/);
-    assert.match(modeCopy('testnet').payLabel('12,34'), /Probar/);
+    assert.match(modeCopy('devnet').hint, /No es plata real/);
+    assert.match(modeCopy('devnet').payNote, /prueba/);
+    assert.match(modeCopy('devnet').payLabel('12,34'), /Probar/);
   });
 
   it('says plainly, in real mode, that it is', () => {
-    assert.match(modeCopy('mainnet').hint, /plata real/);
-    assert.equal(modeCopy('mainnet').payLabel('12,34'), 'Pagar 12,34 USDC');
+    const real = MODES.find((m) => m.network === 'mainnet');
+    assert.ok(real);
+    assert.match(real.hint, /plata real/);
+    assert.equal(real.payLabel('12,34'), 'Pagar 12,34 USDC');
   });
 
   it('explains the one-time step without naming what it is', () => {
@@ -87,11 +94,14 @@ describe('mode copy', () => {
     // "Iniciá sesión" would be the mechanism. A person who agrees to log in
     // has not agreed that the next payment comes out of their own pocket,
     // and that is the only thing that actually changes.
-    assert.match(PREVIEW_MASTHEAD.action, /modo real/);
-    assert.doesNotMatch(PREVIEW_MASTHEAD.action, /sesión|cuenta/i);
+    // Privy is an email login. The button names that door. It still does not
+    // name a chain, a wallet, or a host.
+    assert.equal(PREVIEW_MASTHEAD.action, 'Iniciar sesión');
+    assert.doesNotMatch(PREVIEW_MASTHEAD.action, /solana|stellar|devnet|wallet/i);
   });
 
-  it('RULE: preview says whose money it is, because it is not theirs', () => {
-    assert.match(PREVIEW_MASTHEAD.hint, /nuestra plata/);
+  it('RULE: preview says how to pay, because there is no balance yet', () => {
+    assert.match(PREVIEW_MASTHEAD.hint, /email/);
+    assert.match(PREVIEW_MASTHEAD.hint, /pagar/);
   });
 });

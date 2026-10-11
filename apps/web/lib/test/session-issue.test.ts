@@ -1,36 +1,38 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 
-import { Keypair } from '@stellar/stellar-sdk';
+/**
+ * POST /api/session/login. The browser sends a Privy access token. The
+ * server verifies it and reads the embedded Solana wallet from Privy, so a
+ * body that merely names an address does not get a `chg_user` cookie.
+ */
 
 import { HUMAN_COOKIE, mintHumanToken } from '../human-gate.ts';
 import { readLoggedInUser, sessionSecret, USER_COOKIE, verifyUserToken } from '../login-gate.ts';
+import type { PrivyIdentity } from '../privy-server.ts';
 import { issueUserSession } from '../session-issue.ts';
-import { walletProofMessage, type WalletIntent } from '../wallet-proof.ts';
 
-/**
- * POST /api/session/login. The QA finding (audit C2): any address the
- * browser named got a 30-day `chg_user`, which skips the guest limits.
- */
+const ADDRESS = '5zeMdzZCXkCHbTwvoxtEHRHCP5fe7MLc4fHgG54ENhUD';
+
+let identity: PrivyIdentity | null = {
+  userId: 'did:privy:shopper',
+  address: ADDRESS,
+  email: 'a@example.com',
+};
+
+const verify = async () => identity;
 
 const TURNSTILE = 'turnstile-test-secret';
 const SESSION = 'session-test-secret';
 const now = Date.now();
-const shopper = Keypair.random();
-const stranger = Keypair.random();
 
 const env = {
   NODE_ENV: 'production',
   TURNSTILE_SECRET_KEY: TURNSTILE,
   CHG_SESSION_SECRET: SESSION,
+  NEXT_PUBLIC_PRIVY_APP_ID: 'app',
+  PRIVY_APP_SECRET: 'secret',
 } as NodeJS.ProcessEnv;
-
-function signed(kp: Keypair, address = kp.publicKey(), intent: WalletIntent = 'login') {
-  const message = walletProofMessage(intent, address, now);
-  const digest = createHash('sha256').update(`Stellar Signed Message:\n${message}`, 'utf8').digest();
-  return { message, signature: Buffer.from(kp.sign(digest)).toString('base64') };
-}
 
 async function post(body: unknown, { human = true } = {}): Promise<Request> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -45,51 +47,48 @@ async function status(res: Response): Promise<{ status: number; error?: string; 
 
 describe('POST /api/session/login', () => {
   it('refuses a bare address — the fake login', async () => {
-    const r = await status(await issueUserSession(await post({ address: shopper.publicKey() }), env, now));
+    const r = await status(await issueUserSession(await post({ address: ADDRESS }), env, now, verify));
     assert.equal(r.status, 401);
     assert.equal(r.error, 'session_proof_required');
     assert.equal(r.cookie, null);
   });
 
-  it('refuses a stranger signing for someone else’s address', async () => {
-    const r = await status(
-      await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(stranger, shopper.publicKey()) }), env, now),
-    );
-    assert.equal(r.status, 401);
-    assert.equal(r.cookie, null);
-  });
-
-  it('refuses a proof signed for another purpose', async () => {
-    const proof = signed(shopper, shopper.publicKey(), 'faucet');
-    const r = await status(await issueUserSession(await post({ address: shopper.publicKey(), proof }), env, now));
+  it('refuses a token Privy does not recognise', async () => {
+    identity = null;
+    const r = await status(await issueUserSession(await post({ token: 'not-a-privy-token' }), env, now, verify));
     assert.equal(r.status, 401);
     assert.equal(r.error, 'session_proof_invalid');
+    assert.equal(r.cookie, null);
+    identity = { userId: 'did:privy:shopper', address: ADDRESS, email: 'a@example.com' };
   });
 
-  it('refuses a contract address, which cannot sign SEP-53', async () => {
-    const r = await status(await issueUserSession(await post({ address: 'C' + 'A'.repeat(55) }), env, now));
-    assert.equal(r.status, 400);
+  it('refuses a Privy user who has no Solana wallet yet', async () => {
+    identity = { userId: 'did:privy:shopper', address: null, email: 'a@example.com' };
+    const r = await status(await issueUserSession(await post({ token: 'privy-access-token' }), env, now, verify));
+    assert.equal(r.status, 409);
+    assert.equal(r.error, 'wallet_missing');
+    identity = { userId: 'did:privy:shopper', address: ADDRESS, email: 'a@example.com' };
   });
 
   it('issues nothing in production without CHG_SESSION_SECRET', async () => {
     const noSecret = { ...env, CHG_SESSION_SECRET: '' } as NodeJS.ProcessEnv;
-    const r = await status(await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(shopper) }), noSecret, now));
+    const r = await status(await issueUserSession(await post({ token: 'privy-access-token' }), noSecret, now, verify));
     assert.equal(r.status, 503);
     assert.equal(r.cookie, null);
   });
 
   it('still needs the human cookie', async () => {
-    const r = await status(await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(shopper) }, { human: false }), env, now));
+    const r = await status(await issueUserSession(await post({ token: 'privy-access-token' }, { human: false }), env, now, verify));
     assert.equal(r.status, 403);
   });
 
-  it('signs a session for the wallet that proved itself', async () => {
-    const res = await issueUserSession(await post({ address: shopper.publicKey(), proof: signed(shopper) }), env, now);
+  it('signs a session for the wallet Privy vouched for', async () => {
+    const res = await issueUserSession(await post({ token: 'privy-access-token' }), env, now, verify);
     assert.equal(res.status, 200);
     const cookie = res.headers.get('set-cookie') ?? '';
     const token = decodeURIComponent(/chg_user=([^;]+)/.exec(cookie)?.[1] ?? '');
     const read = await verifyUserToken(token, SESSION, now);
-    assert.deepEqual(read, { ok: true, address: shopper.publicKey() });
+    assert.deepEqual(read, { ok: true, address: ADDRESS });
     assert.match(cookie, /HttpOnly/);
   });
 });

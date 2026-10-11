@@ -23,13 +23,17 @@ describe('checkout copy', () => {
   it('RULE: says a refund is manual, in the mode where the money is real', () => {
     // There is no outbound payment path in this deployment and no key to sign
     // one with. Copy that implied otherwise would be a promise nothing keeps.
-    assert.match(checkoutCopy('mainnet').refundNote, /a mano/);
-    assert.match(checkoutCopy('mainnet').failed, /a mano/);
+    const real = CHECKOUT_MODES[1];
+    assert.match(real.refundNote, /a mano/);
+    assert.match(real.failed, /a mano/);
   });
 
   it('RULE: says plainly, in test mode, that nothing real moves', () => {
-    assert.match(checkoutCopy('testnet').refundNote, /no se mueve plata real/i);
-    assert.match(checkoutCopy('testnet').depositLead, /prueba/i);
+    // devnet is the only network deployments.ts names, and checkoutCopy
+    // answers with the practice voice for it.
+    assert.equal(checkoutCopy('devnet').refundNote, CHECKOUT_MODES[0].refundNote);
+    assert.match(checkoutCopy('devnet').refundNote, /no se mueve plata real/i);
+    assert.match(checkoutCopy('devnet').depositLead, /prueba/i);
   });
 
   it('RULE: never claims the payment itself was confirmed', () => {
@@ -63,10 +67,12 @@ describe('checkout copy', () => {
     // Preview has no session, so no saldo of the shopper's own to spend — the
     // demo wallet pays there and says so. Offering "pagar con mis dólares" to
     // somebody who has none would be a button about money that is not theirs.
-    assert.equal(checkoutCopy('testnet').walletPayCta, '');
-    assert.equal(checkoutCopy('testnet').walletPayLead, '');
-    assert.equal(checkoutCopy('mainnet').demoPayCta, '');
-    assert.match(checkoutCopy('mainnet').walletPayCta, /mis dólares/);
+    const practice = CHECKOUT_MODES[0];
+    const real = CHECKOUT_MODES[1];
+    assert.equal(practice.walletPayCta, '');
+    assert.equal(practice.walletPayLead, '');
+    assert.equal(real.demoPayCta, '');
+    assert.match(real.walletPayCta, /mis dólares/);
   });
 
   it('RULE: the button is the only instruction where there is a button', () => {
@@ -77,7 +83,7 @@ describe('checkout copy', () => {
     // path is now shown only where nothing can pay at all — and the sentence
     // that introduced it has no job left, which is why `walletPayNote` is
     // gone rather than blanked. See `showManual` in CheckoutModal.
-    const real = checkoutCopy('mainnet');
+    const real = CHECKOUT_MODES[1];
     assert.equal('walletPayNote' in real, false);
     // And the lead above the button is now true. It has always said "no hay
     // nada que copiar" while an address and a código sat directly underneath
@@ -90,7 +96,7 @@ describe('checkout copy', () => {
   it('RULE: a short balance is said before the press, and points nowhere false', () => {
     // There is no funding control in this dialog, so "cargá dólares arriba"
     // would send them looking for a button that is not on the screen.
-    const short = checkoutCopy('mainnet').walletPayShort;
+    const short = CHECKOUT_MODES[1].walletPayShort;
     assert.match(short, /No te alcanza/);
     assert.doesNotMatch(short, /arriba|acá/i);
   });
@@ -123,24 +129,24 @@ describe('the single-use card', () => {
     // "cuando cerrás esta ventana, la tarjeta se cierra con ella" would be
     // false — and false in the direction that matters, because a shopper who
     // believes it will not think to come back to a card that still has money.
-    assert.match(checkoutCopy('testnet').cardNote, /se cierra con ella/);
-    assert.doesNotMatch(checkoutCopy('mainnet').cardNote, /se cierra/);
+    assert.match(CHECKOUT_MODES[0].cardNote, /se cierra con ella/);
+    assert.doesNotMatch(CHECKOUT_MODES[1].cardNote, /se cierra/);
   });
 
   it('RULE: the returning-customer words exist only where a card is kept', () => {
     // Empty in the test mode, and the panel keys off that emptiness rather
     // than off the network — so a mode with nothing to come back to cannot
     // render a sentence about a card it no longer has.
-    assert.equal(checkoutCopy('testnet').cardAgainCta, '');
-    assert.equal(checkoutCopy('testnet').cardAgainLead, '');
-    assert.match(checkoutCopy('mainnet').cardAgainCta, /tarjeta/i);
-    assert.match(checkoutCopy('mainnet').cardAgainLead, /misma/i);
+    assert.equal(CHECKOUT_MODES[0].cardAgainCta, '');
+    assert.equal(CHECKOUT_MODES[0].cardAgainLead, '');
+    assert.match(CHECKOUT_MODES[1].cardAgainCta, /tarjeta/i);
+    assert.match(CHECKOUT_MODES[1].cardAgainLead, /misma/i);
   });
 
   it('RULE: a kept card is described by its balance, not by this basket', () => {
     // It can carry change from the last shop, so "justo el importe de esta
     // compra" would be wrong about the one number on screen.
-    assert.match(checkoutCopy('testnet').cardFunded, /justo el importe de esta compra/);
-    assert.match(checkoutCopy('mainnet').cardFunded, /saldo que tiene ahora/);
+    assert.match(CHECKOUT_MODES[0].cardFunded, /justo el importe de esta compra/);
+    assert.match(CHECKOUT_MODES[1].cardFunded, /saldo que tiene ahora/);
   });
 });

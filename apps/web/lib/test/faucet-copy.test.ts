@@ -8,7 +8,8 @@ describe('usdcAmount', () => {
   it('formats token units the Argentine way', () => {
     assert.equal(usdcAmount(GRANT_UNITS), '50,00');
     assert.equal(usdcAmount(ENOUGH_UNITS), '100,00');
-    assert.equal(usdcAmount(12_345_000n), '1,23');
+    // 6 decimals: 12_345_000 units is 12.345 USDC, shown as 12,34.
+    assert.equal(usdcAmount(12_345_000n), '12,34');
     assert.equal(usdcAmount(0n), '0,00');
   });
 });

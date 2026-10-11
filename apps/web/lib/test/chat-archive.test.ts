@@ -63,31 +63,28 @@ describe('archiving a conversation', () => {
     assert.deepEqual(deps.calls, [], 'a guest transcript reached the database');
   });
 
-  it('RULE: preview is never written down either, address or no address', async () => {
-    // The allowlist can put a proven wallet on testnet, so "no session" does
-    // not cover this on its own. `modeKeepsRecords` is asked out loud, and
-    // this is the case that would otherwise hold only by coincidence.
+  it('RULE: a signed-in devnet chat is kept', async () => {
+    // This deployment has one network and it is the one people use. There is
+    // no preview drop in front of the database: a proven address is a record.
     const deps = spy();
     const outcome = await archiveChat(
-      { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
+      { id: 'c1', network: 'devnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
       deps,
     );
-    assert.equal(outcome, 'preview');
-    assert.deepEqual(deps.calls, [], 'a preview transcript reached the database');
+    assert.equal(outcome, 'saved');
+    assert.equal(deps.calls.length, 1);
   });
 
-  it('RULE: the mode is checked before the database, so preview never dials one', async () => {
-    // Ordering, not pedantry: a deployment always has DATABASE_URL set, so
-    // asking `hasDatabase` first would answer 'no-database' for nobody and
-    // hide the reason preview writes nothing.
+  it('RULE: a missing database is why nothing is written, including on devnet', async () => {
     const deps = { ...spy(), hasDatabase: () => false };
     assert.equal(
       await archiveChat(
-        { id: 'c1', network: 'testnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
+        { id: 'c1', network: 'devnet', address: WALLET, turn: turnWith('hola'), title: 'hola' },
         deps,
       ),
-      'preview',
+      'no-database',
     );
+    assert.deepEqual(deps.calls, []);
   });
 
   it('writes nothing with no database configured', async () => {

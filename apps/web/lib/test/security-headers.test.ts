@@ -30,7 +30,8 @@ describe('shopper security headers', () => {
     const csp = appContentSecurityPolicy('production', none);
     assert.match(csp, /script-src [^;]*https:\/\/challenges\.cloudflare\.com/);
     assert.match(csp, /frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
-    assert.match(csp, /connect-src [^;]*https:\/\/sdk\.api\.pollar\.xyz/);
+    assert.match(csp, /connect-src [^;]*https:\/\/auth\.privy\.io/);
+    assert.match(csp, /connect-src [^;]*https:\/\/api\.devnet\.solana\.com/);
     assert.match(csp, /img-src [^;]*https:\/\/\*\.vtexassets\.com/);
     assert.match(csp, /object-src 'none'/);
     assert.doesNotMatch(csp, /'unsafe-eval'/);
@@ -44,9 +45,8 @@ describe('shopper security headers', () => {
     const csp = appContentSecurityPolicy('production', none);
     const connect = csp.split(';').find((d) => d.trim().startsWith('connect-src')) ?? '';
     for (const net of NETWORK_IDS) {
-      for (const url of [DEPLOYMENTS[net].horizonUrl, DEPLOYMENTS[net].rpcUrl]) {
-        assert.ok(connect.includes(new URL(url).origin), `${net}: ${url} is not in connect-src`);
-      }
+      const url = DEPLOYMENTS[net].rpcUrl;
+      assert.ok(connect.includes(new URL(url).origin), `${net}: ${url} is not in connect-src`);
     }
   });
 
