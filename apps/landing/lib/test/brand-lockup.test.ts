@@ -47,7 +47,20 @@ test('the home header is the wordmark alone', () => {
 });
 
 test('the shopper header is the wordmark alone, not the mascot and not type', () => {
-  const shopper = source(join(web, 'app/page.tsx'));
+  // Solana draws the name in the top bar. Stellar still draws it in the page
+  // masthead. The rule is about the header the shopper sees, not which file
+  // holds it, and exactly one of those files carries the image.
+  const places = ['app/page.tsx', 'components/TopBar.tsx']
+    .map((rel) => join(web, rel))
+    .filter((path) => {
+      try {
+        return source(path).includes('/brand/wordmark.png');
+      } catch {
+        return false;
+      }
+    });
+  assert.equal(places.length, 1, `wordmark should live in one header, found ${places.join(', ')}`);
+  const shopper = source(places[0]!);
 
   assert.match(shopper, /src="\/brand\/wordmark\.png"/);
   assert.equal(shopper.includes('lockup-stacked'), false);
