@@ -8,6 +8,7 @@
 # One prefix per line, matched against the start of each changed file's path.
 # Keep this file the same in both repos: it is itself a shared path.
 .github/
+.cursor/
 packages/mcp/
 packages/trust/
 apps/web/lib/agent/

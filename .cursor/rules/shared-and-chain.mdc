@@ -1,0 +1,26 @@
+---
+description: Shared app code syncs to both deploys; chain integrations stay in one repo
+alwaysApply: true
+---
+
+# Shared app vs chain
+
+App features (chat, cart, store checkout, catalogue, landing, sandbox) ship to `sol.changuito.me`, `ste.changuito.me`, and `app.changuito.me`. Chain integrations stay in the repo that owns that chain.
+
+The path list is `.github/shared-paths.txt`. A PR that touches one of those paths needs `shared` (sync.yml carries it on merge) or `chain-only` (it stays here on purpose).
+
+Shared today: `.github/`, `.cursor/`, `packages/mcp/`, `packages/trust/`, `apps/web/lib/agent/`, the chat, login, and human-gate modules named in that file, `apps/landing/`, `services/sandbox/`, `supabase/migrations/`.
+
+Do not copy these into the other repo:
+
+- Solana only: `anchor/`, `apps/web/lib/solana.ts`, `escrow.ts`, `usdc.ts`, `privy-server.ts`, `use-wallet.ts`, `apps/web/lib/checkout/`, `docs/solana.md`
+- Stellar only: `contracts/`, `packages/escrow-bindings/`, `packages/usdc-bindings/`, `apps/web/lib/stellar.ts`, `deposit.ts`, `trustline.ts`, `ledger/`, `pay/`, `docs/stellar.md`
+
+If a shared file must diverge, label `chain-only` and say why. Prefer a small adapter next to the chain code.
+
+```text
+# App feature (chat empty state) → edit apps/web, label shared
+# Solana settle instruction → edit anchor/ or lib/solana.ts, no shared label
+```
+
+Shared PR titles and bodies do not name either repo. `sync.yml` rejects a ping-pong: the sibling PR is `chain-only` on a `sync/` branch. Rebase-merge is off.

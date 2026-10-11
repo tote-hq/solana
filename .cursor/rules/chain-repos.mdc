@@ -1,0 +1,17 @@
+---
+description: Which Changuito repo this is, where it deploys, and where work lands
+alwaysApply: true
+---
+
+# Changuito repos
+
+Land work in `tote-hq/solana` or `tote-hq/stellar`. Do not open it against forks (`raptor0929/changuito`, `Simonethg/changuito`). Read `git remote -v` before editing.
+
+| Repo | What it owns | Shop deploy |
+|---|---|---|
+| `tote-hq/solana` | Solana escrow and wallet | `sol.changuito.me` |
+| `tote-hq/stellar` | Stellar escrow and wallet | `ste.changuito.me` |
+
+`www.changuito.me` is `apps/landing`, the same site from either repo. `app.changuito.me` is the shop the person uses: promote shared app behavior there. `sol` and `ste` are the same app with that repo's chain wired in.
+
+A change for one chain stays in that repo. App behavior is written once and shipped to every deploy.

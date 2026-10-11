@@ -1,0 +1,18 @@
+---
+description: Shopper-facing copy never mentions the chain split
+globs: apps/landing/**/*.{ts,tsx},apps/web/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# One product for the shopper
+
+The person shopping does not learn that two repos or two chains exist.
+
+- Copy talks about the shop, pesos, and USDC. It does not say Solana, Stellar, wallet, escrow, testnet, `sol.changuito.me`, or `ste.changuito.me`.
+- Landing components and strings stay identical. A landing change is `shared`.
+- Chain names belong in `docs/solana.md` or `docs/stellar.md`, contract comments, and env examples — not in `lib/copy.ts`, `ui-copy.ts`, landing copy, or component text.
+
+```tsx
+// ❌ "Pagá con USDC en Solana"
+// ✅ "Pagá el total en USDC. Si la compra no se completa, no pagás."
+```
