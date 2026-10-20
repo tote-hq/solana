@@ -7,6 +7,7 @@ import type { ChatImage } from '../chat-image.ts';
 import type { UiEvent } from '../protocol';
 import { earlyLocationAsk } from './early-ask';
 import { changuitoPrompt, stateBanner } from './prompt';
+import { topicGuardReply } from './topic-guard';
 import { anthropicProvider } from './providers/anthropic';
 import { openaiProvider } from './providers/openai';
 import type { HopResult } from './providers/types';
@@ -125,6 +126,34 @@ export async function runTurn(
   image?: ChatImage,
 ): Promise<{ brain: string }> {
   const t0 = Date.now();
+
+  // Before the model and before early-ask. A first message that is not about
+  // shopping must not be answered with the postal-code question, and it must
+  // not boot MCP. The check fails open, so a real basket still falls through
+  // to early-ask and the usual hop. See topic-guard.ts.
+  const refusal = topicGuardReply(userText, lang);
+  if (refusal) {
+    const location = session.state.getLocation();
+    const cart = turn.cache.cart;
+    turn.messages.push(
+      {
+        role: 'user',
+        content: shopperTurn(
+          userText,
+          stateBanner({
+            retailer: location?.retailer,
+            postalCode: location?.postalCode,
+            cartLines: cart?.lines.length,
+            cartTotal: cart?.total.display,
+          }),
+          image,
+        ),
+      },
+      { role: 'assistant', content: [{ type: 'text', text: refusal }] },
+    );
+    emit({ t: 'text', delta: refusal });
+    return { brain: 'topic-guard' };
+  }
 
   // Before the model: see early-ask.ts.
   const ask = earlyLocationAsk({
