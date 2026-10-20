@@ -3,6 +3,7 @@ import { Chat } from '../components/Chat';
 import { Deck } from '../components/Deck';
 import { FooterSocial } from '../components/FooterSocial';
 import { FounderTrust } from '../components/FounderTrust';
+import { PoweredBy } from '../components/PoweredBy';
 import { HumanGate } from '../components/HumanGate';
 import { LangProvider } from '../components/LangProvider';
 import { LangToggle } from '../components/LangToggle';
@@ -58,8 +59,19 @@ export default async function Home() {
                 </HumanGate>
                 <footer className="app-footer">
                   <FounderTrust />
-                  <FooterSocial />
-                  <LangToggle />
+                  <div
+                    className="app-footer-tools"
+                    role="group"
+                    aria-label={inLang(lang, {
+                      es: 'Redes y idioma',
+                      en: 'Social profiles and language',
+                    })}
+                  >
+                    <FooterSocial />
+                    <span className="app-footer-rule" aria-hidden="true" />
+                    <LangToggle />
+                  </div>
+                  <PoweredBy />
                 </footer>
               </main>
             </Deck>

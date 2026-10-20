@@ -2,12 +2,19 @@
 
 import { newTabHint } from '../lib/founder-trust-copy';
 import { socialLinks } from '../lib/social';
-import { InstagramIcon, XIcon } from './icons';
+import { InstagramIcon, LinkedInIcon, XIcon } from './icons';
 import { useLang } from './LangProvider';
 
 const ICONS = {
   instagram: InstagramIcon,
   x: XIcon,
+} as const;
+
+/** Company page. Not one of `SOCIAL`: that list is the two accounts the landing compares verbatim. */
+const LINKEDIN = {
+  href: 'https://www.linkedin.com/company/appchanguito/',
+  ariaLabel: 'LinkedIn de Changuito',
+  ariaLabelEn: 'Changuito on LinkedIn',
 } as const;
 
 /**
@@ -49,6 +56,18 @@ export function FooterSocial() {
             </li>
           );
         })}
+        <li>
+          <a
+            className="app-social-link"
+            href={LINKEDIN.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${lang === 'en' ? LINKEDIN.ariaLabelEn : LINKEDIN.ariaLabel} (${hint})`}
+            data-testid="app-social-linkedin"
+          >
+            <LinkedInIcon />
+          </a>
+        </li>
       </ul>
     </nav>
   );
