@@ -59,6 +59,9 @@ export default async function Home() {
                 <footer className="app-footer">
                   <FounderTrust />
                   <FooterSocial />
+                  <a className="app-legal" href="/privacidad">
+                    {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                  </a>
                   <LangToggle />
                 </footer>
               </main>

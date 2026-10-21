@@ -88,6 +88,10 @@ export interface WalletCopy {
   cardAria: string;
   purchasesAria: string;
   signOutAria: string;
+  /** Short label on the phone-account button. */
+  phoneCta: string;
+  /** Spoken name: which account the button signs in. */
+  phoneAria: string;
 }
 
 export interface PaymentCopy {
@@ -297,6 +301,8 @@ const ES: UiCopy = {
     cardAria: 'Mi tarjeta',
     purchasesAria: 'Mis compras',
     signOutAria: 'Salir',
+    phoneCta: 'Teléfono',
+    phoneAria: 'Entrar con la cuenta de este teléfono',
   },
   payment: {
     aria: 'Confirmar el pago',
@@ -495,6 +501,8 @@ const EN: UiCopy = {
     cardAria: 'My card',
     purchasesAria: 'My purchases',
     signOutAria: 'Sign out',
+    phoneCta: 'Phone',
+    phoneAria: 'Sign in with the account on this phone',
   },
   payment: {
     aria: 'Confirm the payment',

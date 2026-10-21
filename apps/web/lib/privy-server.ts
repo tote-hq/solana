@@ -61,3 +61,40 @@ export async function verifyPrivyToken(
   const email = accounts.find((a) => a.type === 'email')?.address ?? null;
   return { userId, address: wallet?.address ?? null, email };
 }
+
+export type PrivyDeleteResult = 'deleted' | 'skipped' | 'failed';
+
+/**
+ * Ask Privy to delete the user behind this access token.
+ *
+ * Skipped when there is no token or this server has no Privy app secret: a
+ * phone-wallet sign-in has neither, and that is not a failure. Failed when
+ * the token does not verify, names a different wallet than the session, or
+ * Privy refuses the delete. 404 counts as deleted — the user is already gone.
+ * Never logs the token.
+ */
+export async function deletePrivyUser(
+  token: string | null | undefined,
+  expectedAddress: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<PrivyDeleteResult> {
+  if (!token?.trim()) return 'skipped';
+  const appId = env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
+  const secret = env.PRIVY_APP_SECRET ?? '';
+  if (!appId || !secret) return 'skipped';
+
+  const who = await verifyPrivyToken(token, env);
+  if (!who?.userId || who.address !== expectedAddress) return 'failed';
+
+  const res = await fetch(`${AUTH}/api/v1/users/${encodeURIComponent(who.userId)}`, {
+    method: 'DELETE',
+    headers: {
+      authorization: `Basic ${Buffer.from(`${appId}:${secret}`).toString('base64')}`,
+      'privy-app-id': appId,
+    },
+    cache: 'no-store',
+  }).catch(() => null);
+  if (!res) return 'failed';
+  if (res.ok || res.status === 404) return 'deleted';
+  return 'failed';
+}

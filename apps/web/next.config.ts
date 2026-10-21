@@ -20,6 +20,11 @@ const config: NextConfig = {
       ...(fixture.length ? [{ source: FIXTURE_PATH, headers: fixture }] : []),
     ];
   },
+  async rewrites() {
+    // Some installers ask for /manifest.json. Next serves the manifest at
+    // /manifest.webmanifest; this name points at the same document.
+    return [{ source: '/manifest.json', destination: '/manifest.webmanifest' }];
+  },
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // `@changuito/mcp` is a workspace package of compiled ESM. It gets bundled
   // rather than marked external, because a symlinked workspace package that
