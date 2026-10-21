@@ -64,8 +64,8 @@ taught us why.
 | **`@solana-program/token`**, **`/system`** | ^0.17.0, ^0.15.0 | ATA creation, `mintTo`, SOL transfer (the faucet) |
 | **`@privy-io/react-auth`** | 3.47.0 (exact) | email and Google login, the embedded Solana wallet, and `useSignTransaction` (sign only; the server sends `open` with the resolver as fee payer) |
 | **`jose`** | ^6.1.0 | verifies the Privy access token against the app's JWKS server-side. `@privy-io/node` is not used: it pins `@solana/kit` 5 |
-| **Anchor** | 0.32 (`anchor-lang`, `anchor-spl` with `token`) | the escrow program, `anchor/programs/changuito_escrow` |
-| **Platform tools** | v1.52 (`cargo build-sbf --tools-version v1.52`) | older ones cannot parse the edition-2024 crates in the dependency tree |
+| **Anchor** | 1.2.1 (`anchor-lang`, `anchor-spl` with `token`) | the escrow program, `anchor/programs/changuito_escrow` |
+| **Platform tools** | v1.56, SBPF v3 (`cargo build-sbf --tools-version v1.56 --arch v3`) | Agave 4.3+ refuses v0 deployments; older tools cannot emit v3 or parse the edition-2024 crates in the dependency tree |
 | **Cluster** | devnet only | hard-coded in `lib/deployments.ts` (generated) and the deploy script, on purpose |
 
 The money rail is the escrow program: the buyer's wallet signs `open`, the
@@ -160,9 +160,9 @@ runtime with `MODULE_NOT_FOUND`.
 
 | | |
 |---|---|
-| **Language** | Rust 2021, Anchor 0.32, `crate-type = ["cdylib", "lib"]` |
+| **Language** | Rust 2021, Anchor 1.2, `crate-type = ["cdylib", "lib"]` |
 | **Release profile** | `lto = "fat"`, `codegen-units = 1`, **`overflow-checks = true`** |
-| **Build** | `npm run program:build` → `cargo build-sbf --tools-version v1.52`; IDL with `anchor idl build` |
+| **Build** | `npm run program:build` → `cargo build-sbf --tools-version v1.56 --arch v3`; IDL with `anchor idl build` |
 | **Tests** | no Rust test suite. Verified on devnet: `scripts/solana-init.mts` smokes open → settle and open → refund after every deploy, and `scripts/devnet-e2e.mts` drives both paths through the app's routes |
 
 ## Infrastructure

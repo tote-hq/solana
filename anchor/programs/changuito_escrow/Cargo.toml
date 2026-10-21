@@ -15,7 +15,15 @@ no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+# cfgs Anchor's macros emit; declared so `unexpected_cfgs` stays quiet.
+anchor-debug = []
+custom-heap = []
+custom-panic = []
 
 [dependencies]
-anchor-lang = { version = "0.32.0", features = ["init-if-needed"] }
-anchor-spl = { version = "0.32.0", features = ["token"] }
+# Every anchor-* crate on the same version, and the CLI to match.
+anchor-lang = { version = "=1.2.1", features = ["init-if-needed"] }
+anchor-spl = { version = "=1.2.1", features = ["token"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

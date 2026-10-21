@@ -12,7 +12,7 @@ it in USDC on Solana devnet. Five pieces, each with one job:
 2. **An agent** (`apps/web/lib/agent`) that drives it: a streaming Anthropic
    tool loop with the MCP tools on one side and display-only render tools on
    the other. [`../CLAUDE.md`](../CLAUDE.md) documents it in detail.
-3. **An escrow program** (`anchor/programs/changuito_escrow`, Anchor 0.32) that
+3. **An escrow program** (`anchor/programs/changuito_escrow`, Anchor 1.2) that
    holds the shopper's USDC between "I approved this basket" and "the basket
    was carried through the store's checkout". See [solana.md](solana.md).
 4. **A checkout sandbox** (`services/sandbox`, Python, on Railway): Jev +

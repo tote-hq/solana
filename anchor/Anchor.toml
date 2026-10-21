@@ -1,6 +1,6 @@
 [toolchain]
-# The CLI only writes the IDL here; the program's crates stay on 0.32.
-anchor_version = "1.2.0"
+anchor_version = "1.2.1"
+solana_version = "4.3.0"
 
 [features]
 resolution = true
@@ -11,9 +11,6 @@ changuito_escrow = "BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d"
 
 [programs.localnet]
 changuito_escrow = "11111111111111111111111111111111"
-
-[registry]
-url = "https://api.apr.dev"
 
 [provider]
 cluster = "devnet"
