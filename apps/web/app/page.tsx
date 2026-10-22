@@ -3,6 +3,7 @@ import { Chat } from '../components/Chat';
 import { Deck } from '../components/Deck';
 import { FooterSocial } from '../components/FooterSocial';
 import { FounderTrust } from '../components/FounderTrust';
+import { PoweredBy } from '../components/PoweredBy';
 import { HumanGate } from '../components/HumanGate';
 import { LangProvider } from '../components/LangProvider';
 import { LangToggle } from '../components/LangToggle';
@@ -58,11 +59,24 @@ export default async function Home() {
                 </HumanGate>
                 <footer className="app-footer">
                   <FounderTrust />
-                  <FooterSocial />
-                  <a className="app-legal" href="/privacidad">
-                    {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
-                  </a>
-                  <LangToggle />
+                  {/* Tools stay one group: social, the privacy link from main,
+                      and the language switch. Powered by is the centre lockup. */}
+                  <div
+                    className="app-footer-tools"
+                    role="group"
+                    aria-label={inLang(lang, {
+                      es: 'Redes, privacidad e idioma',
+                      en: 'Social profiles, privacy, and language',
+                    })}
+                  >
+                    <FooterSocial />
+                    <span className="app-footer-rule" aria-hidden="true" />
+                    <a className="app-legal" href="/privacidad">
+                      {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                    </a>
+                    <LangToggle />
+                  </div>
+                  <PoweredBy />
                 </footer>
               </main>
             </Deck>

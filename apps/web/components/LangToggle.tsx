@@ -18,11 +18,12 @@ import { useLang, useSetLang } from './LangProvider';
  * ## The label is the destination, in the destination's language
  *
  * A toggle reading "ES" is ambiguous in the way that matters — is that the
- * language I am in, or the one I would get? So the button says **English**
- * when the page is Spanish, and **Español** when it is English. The word is
- * always in the language it takes you to, so the one person who genuinely
- * needs this control can read it without being able to read anything else on
- * the page. `aria-label` follows the same rule.
+ * language I am in, or the one I would get? The accessible name still says
+ * **English** when the page is Spanish, and **Español** when it is English,
+ * always in the language it takes you to. The visible face is the short code
+ * (EN / ES) because the footer lockup is a 32px pill beside 16px glyphs; the
+ * code is the first token of the accessible name, so the visible text is in
+ * the name.
  *
  * `lang` on the element tells a screen reader to switch voice for that word,
  * so "Español" inside an English page is not read as English.
@@ -46,6 +47,7 @@ export function LangToggle() {
   const setLang = useSetLang();
   const router = useRouter();
   const next = LANG_SWITCH[lang];
+  const short = next.to === 'en' ? 'EN' : 'ES';
 
   const flip = () => {
     setLang(next.to);
@@ -57,12 +59,14 @@ export function LangToggle() {
       type="button"
       className="app-lang"
       lang={next.to}
-      aria-label={next.aria}
+      aria-label={`${short}. ${next.aria}`}
       data-testid="app-lang"
       onClick={flip}
     >
-      <GlobeIcon />
-      <span className="app-lang-label">{next.label}</span>
+      <span className="app-lang-face">
+        <GlobeIcon />
+        <span className="app-lang-label">{short}</span>
+      </span>
     </button>
   );
 }
