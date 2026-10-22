@@ -100,7 +100,7 @@ Full detail in **[docs/solana.md](docs/solana.md)**.
 
 | | Address (Solscan, devnet) |
 |---|---|
-| **Escrow program** `changuito_escrow` (Anchor 0.32) | [`BFa1gZL9…vLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) |
+| **Escrow program** `changuito_escrow` (Anchor 1.2) | [`BFa1gZL9…vLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) |
 | **Config PDA** `["config"]`: resolver, treasury, mint. Set once; the program has no setter | [`BCcorb5C…BPh`](https://solscan.io/account/BCcorb5CVL86uDQQT4fBusAcobXugFfTTM6ypL4bDBPh?cluster=devnet) |
 | **Mock USDC** (6 decimals, minted by the in-app faucet) | [`BZ6CHGyR…LG85`](https://solscan.io/account/BZ6CHGyRnuuGRxDmd1bCFdeUTCJGcGcWtUct1NMELG85?cluster=devnet) |
 | **Resolver**: settles, refunds, mints faucet USDC | [`5zeMdzZC…hUD`](https://solscan.io/account/5zeMdzZCXkCHbTwvoxtEHRHCP5fe7MLc4fHgG54ENhUD?cluster=devnet) |

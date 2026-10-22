@@ -19,7 +19,7 @@ read one section. It states what is simulated, by us, before you find it.
 | **Built by** | [SimonethG](https://www.linkedin.com/in/simonethg/) and [Fabio](https://www.linkedin.com/in/fabio-laura-yavi/), in Argentina |
 | **Cluster** | Solana **devnet** only. There is no mainnet configuration in the code |
 | **What is on-chain** | an Anchor escrow: the shopper locks USDC, the backend resolver settles it to a treasury or refunds it. Every order is an account you can read |
-| **Program** | `changuito_escrow` [`BFa1gZL9…vLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) — Anchor 0.32, source in [`anchor/programs/changuito_escrow`](../anchor/programs/changuito_escrow) |
+| **Program** | `changuito_escrow` [`BFa1gZL9…vLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) — Anchor 1.2, source in [`anchor/programs/changuito_escrow`](../anchor/programs/changuito_escrow) |
 | **USDC** | our own devnet mint, 6 decimals, [`BZ6CHGyR…MELG85`](https://solscan.io/account/BZ6CHGyRnuuGRxDmd1bCFdeUTCJGcGcWtUct1NMELG85?cluster=devnet). The resolver is its mint authority; the in-app faucet hands out 50 at a time |
 | **Wallet** | Privy (`@privy-io/react-auth` 3.47.0): email or Google login creates an embedded Solana wallet that only signs. The server's resolver key pays the `open` fee and co-signs only the exact transaction it built, so a shopper needs no prior wallet and no SOL for fees |
 | **Pitch video** | sources in [`creatives/`](../creatives) (Remotion). No hosted link in this repo — `npm run render` in any of those folders produces the mp4 |

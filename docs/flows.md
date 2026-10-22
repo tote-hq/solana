@@ -421,7 +421,7 @@ another wallet. Nothing server-side is involved.
 
 ## 8. The escrow program, in one screen
 
-`anchor/programs/changuito_escrow/src/lib.rs`, Anchor 0.32, deployed at
+`anchor/programs/changuito_escrow/src/lib.rs`, Anchor 1.2, deployed at
 [`BFa1gZL9…fXvLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet).
 The full account layout and the client are in [solana.md](solana.md).
 

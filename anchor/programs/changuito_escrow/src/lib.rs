@@ -88,7 +88,7 @@ pub mod changuito_escrow {
 
         token::transfer(
             CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                Token::id(),
                 Transfer {
                     from: ctx.accounts.buyer_token.to_account_info(),
                     to: ctx.accounts.vault.to_account_info(),
@@ -124,10 +124,9 @@ pub mod changuito_escrow {
         let buyer = order.buyer;
 
         drain(
-            &ctx.accounts.token_program,
             &ctx.accounts.vault,
             &ctx.accounts.treasury_token,
-            &ctx.accounts.buyer,
+            &ctx.accounts.buyer.to_account_info(),
             &ctx.accounts.order.to_account_info(),
             order_id,
             bump,
@@ -158,10 +157,9 @@ pub mod changuito_escrow {
         let buyer = order.buyer;
 
         drain(
-            &ctx.accounts.token_program,
             &ctx.accounts.vault,
             &ctx.accounts.buyer_token,
-            &ctx.accounts.buyer,
+            &ctx.accounts.buyer.to_account_info(),
             &ctx.accounts.order.to_account_info(),
             order_id,
             bump,
@@ -175,9 +173,7 @@ pub mod changuito_escrow {
 
 /// Empty the vault into `to`, then close it and hand its rent to the buyer,
 /// who paid it at `open`. The order PDA signs for both.
-#[allow(clippy::too_many_arguments)]
 fn drain<'info>(
-    token_program: &Program<'info, Token>,
     vault: &Account<'info, TokenAccount>,
     to: &Account<'info, TokenAccount>,
     rent_to: &AccountInfo<'info>,
@@ -190,7 +186,7 @@ fn drain<'info>(
     let signer = &[seeds];
     token::transfer(
         CpiContext::new_with_signer(
-            token_program.to_account_info(),
+            Token::id(),
             Transfer {
                 from: vault.to_account_info(),
                 to: to.to_account_info(),
@@ -201,7 +197,7 @@ fn drain<'info>(
         amount,
     )?;
     token::close_account(CpiContext::new_with_signer(
-        token_program.to_account_info(),
+        Token::id(),
         CloseAccount {
             account: vault.to_account_info(),
             destination: rent_to.clone(),
@@ -267,7 +263,7 @@ pub struct Settle<'info> {
     pub treasury_token: Account<'info, TokenAccount>,
     /// CHECK: receives the vault's rent; pinned to `order.buyer` by `has_one`.
     #[account(mut)]
-    pub buyer: AccountInfo<'info>,
+    pub buyer: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -284,7 +280,7 @@ pub struct Refund<'info> {
     pub buyer_token: Account<'info, TokenAccount>,
     /// CHECK: receives the vault's rent; pinned to `order.buyer` by `has_one`.
     #[account(mut)]
-    pub buyer: AccountInfo<'info>,
+    pub buyer: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
 }
 

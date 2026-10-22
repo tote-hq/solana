@@ -9,7 +9,7 @@ Explorer links use Solscan with `?cluster=devnet`.
 
 | What | Address |
 |---|---|
-| Program `changuito_escrow` (Anchor 0.32) | [`BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) |
+| Program `changuito_escrow` (Anchor 1.2) | [`BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d`](https://solscan.io/account/BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d?cluster=devnet) |
 | Config PDA `["config"]` | [`BCcorb5CVL86uDQQT4fBusAcobXugFfTTM6ypL4bDBPh`](https://solscan.io/account/BCcorb5CVL86uDQQT4fBusAcobXugFfTTM6ypL4bDBPh?cluster=devnet) |
 | Mock USDC mint (6 decimals, authority = resolver) | [`BZ6CHGyRnuuGRxDmd1bCFdeUTCJGcGcWtUct1NMELG85`](https://solscan.io/account/BZ6CHGyRnuuGRxDmd1bCFdeUTCJGcGcWtUct1NMELG85?cluster=devnet) |
 | Resolver (settles, refunds, mints faucet USDC, pays `open` fees) | [`5zeMdzZCXkCHbTwvoxtEHRHCP5fe7MLc4fHgG54ENhUD`](https://solscan.io/account/5zeMdzZCXkCHbTwvoxtEHRHCP5fe7MLc4fHgG54ENhUD?cluster=devnet) |
