@@ -23,6 +23,17 @@ export interface ProfileCopy {
   saved: string;
   failed: string;
   loading: string;
+  deleteHeading: string;
+  deleteAccount: string;
+  deleteLead: string;
+  deleteKeeps: string;
+  deleteConfirm: string;
+  deleteCancel: string;
+  deleteWorking: string;
+  deleteFailed: string;
+  deletePrivyFailed: string;
+  deleteDone: string;
+  privacyLink: string;
 }
 
 const ES: ProfileCopy = {
@@ -48,6 +59,19 @@ const ES: ProfileCopy = {
   saved: 'Listo, guardado.',
   failed: 'No pudimos guardar. Probá de nuevo.',
   loading: 'Cargando tu perfil…',
+  deleteHeading: 'Eliminar cuenta y datos',
+  deleteAccount: 'Eliminar cuenta y datos',
+  deleteLead:
+    'Se borra el perfil cifrado (email, contraseña, DNI y código postal de Día), los chats, los pedidos asociados, los checkouts guardados y el contador de uso. Se cierra la sesión y se limpia este navegador.',
+  deleteKeeps: 'No podemos borrar tu cuenta de Día ni lo que ya quedó escrito en la cadena (el depósito en USDC).',
+  deleteConfirm: 'Sí, eliminar',
+  deleteCancel: 'Cancelar',
+  deleteWorking: 'Eliminando…',
+  deleteFailed: 'No pudimos eliminar la cuenta. Probá de nuevo.',
+  deletePrivyFailed:
+    'Los datos de Changuito ya se borraron. El ingreso por email no se pudo eliminar. Volvé a entrar para intentarlo de nuevo.',
+  deleteDone: 'Listo',
+  privacyLink: 'Política de privacidad',
 };
 
 const EN: ProfileCopy = {
@@ -73,6 +97,19 @@ const EN: ProfileCopy = {
   saved: 'Done, saved.',
   failed: "We couldn't save. Try again.",
   loading: 'Loading your profile…',
+  deleteHeading: 'Delete account and data',
+  deleteAccount: 'Delete account and data',
+  deleteLead:
+    'This deletes the encrypted profile (Día email, password, DNI and postal code), chats, associated orders, stored checkouts and the usage counter. It ends the session and clears this browser.',
+  deleteKeeps: 'We cannot delete your Día account or what is already written on the chain (the USDC deposit).',
+  deleteConfirm: 'Yes, delete',
+  deleteCancel: 'Cancel',
+  deleteWorking: 'Deleting…',
+  deleteFailed: "We couldn't delete the account. Try again.",
+  deletePrivyFailed:
+    'Your Changuito data is already gone. The email sign-in could not be deleted. Sign in again to retry.',
+  deleteDone: 'Done',
+  privacyLink: 'Privacy policy',
 };
 
 /** GET/PUT /api/profile's 503: what happened, and that the saved details are safe. */

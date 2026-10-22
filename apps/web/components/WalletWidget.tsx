@@ -40,6 +40,7 @@ export function WalletWidget() {
   const { data, loading, error, refresh } = useBalances(address);
 
   const [funding, setFunding] = useState(false);
+  const [phoneBusy, setPhoneBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [receiving, setReceiving] = useState(false);
@@ -83,6 +84,9 @@ export function WalletWidget() {
   useEffect(() => {
     if (!address) return;
     track('payment_view', { state: 'ready' });
+    // A phone wallet already posted its signed proof. Asking again with a
+    // null Privy token would record a failed login.
+    if (wallet.kind === 'mobile') return;
     let cancelled = false;
     void ensureUserCookie(address, wallet.accessToken).then((ok) => {
       if (!cancelled && !ok) track('login_fail', { code: 'session' });
@@ -90,7 +94,7 @@ export function WalletWidget() {
     return () => {
       cancelled = true;
     };
-  }, [address, wallet.accessToken]);
+  }, [address, wallet.accessToken, wallet.kind]);
 
   // Signing out leaves nothing of this account in the browser: the session
   // cookie, the stored chats (history, carts, receipts, postcode), Privy's
@@ -131,27 +135,43 @@ export function WalletWidget() {
     }
   }
 
-  if (!wallet.enabled) {
-    return (
-      <div className="topbar-wallet wallet-off" title="Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md">
-        <span className="topbar-muted">{copy.unconfigured}</span>
-      </div>
-    );
-  }
-
   if (!address) {
     return (
-      <div className="topbar-wallet">
+      <div
+        className={wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
+        title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md'}
+      >
         <ModeBadge network="devnet" />
-        <span className="topbar-muted topbar-hint">{masthead.hint}</span>
+        {wallet.enabled ? (
+          <span className="topbar-muted topbar-hint">{masthead.hint}</span>
+        ) : (
+          <span className="topbar-muted">{copy.unconfigured}</span>
+        )}
+        {wallet.enabled ? (
+          <button
+            type="button"
+            className="btn topbar-btn"
+            onClick={() => trackLoginStart(wallet.login)}
+            disabled={!wallet.ready}
+          >
+            {masthead.action}
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn topbar-btn"
-          onClick={() => trackLoginStart(wallet.login)}
-          disabled={!wallet.ready}
+          data-testid="wallet-mobile"
+          aria-label={copy.phoneAria}
+          disabled={phoneBusy}
+          onClick={() => { setPhoneBusy(true); void wallet.loginMobile().catch((err) => setNote(err instanceof Error ? err.message : String(err))).finally(() => setPhoneBusy(false)); }}
         >
-          {masthead.action}
+          {copy.phoneCta}
         </button>
+        {note ? (
+          <p className="topbar-toast" role="status">
+            {note}
+          </p>
+        ) : null}
       </div>
     );
   }

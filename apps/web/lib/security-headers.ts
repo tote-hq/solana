@@ -88,7 +88,10 @@ export function appContentSecurityPolicy(
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${PRODUCT_IMAGES}${join(vendors.img)}`,
     "font-src 'self' data:",
-    `connect-src 'self'${isProd ? '' : ' ws: wss:'} ${PRIVY.join(' ')} ${PRIVY_WS.join(' ')} ${SOLANA.join(' ')}${join(vendors.connect)} ${TURNSTILE_ORIGIN}`,
+    // Mobile Wallet Adapter associates on an ephemeral localhost port
+    // (49152–65535, path /solana-wallet). CSP3 `*` here is a port wildcard.
+    // The same probe fetches http://localhost and is caught if it fails.
+    `connect-src 'self' http://localhost http://127.0.0.1 ws://localhost:* ws://127.0.0.1:*${isProd ? '' : ' ws: wss:'} ${PRIVY.join(' ')} ${PRIVY_WS.join(' ')} ${SOLANA.join(' ')}${join(vendors.connect)} ${TURNSTILE_ORIGIN}`,
     // Turnstile's challenge, and the supermarket checkout the shopper
     // finishes the order on. 'self' is the dev fixture at /dev/checkout,
     // which stands in for a store that has no sandbox. This is the frames

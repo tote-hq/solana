@@ -15,15 +15,23 @@ import { createContext, useContext } from 'react';
 export interface WalletState {
   /** This build has a Privy app id at all. */
   enabled: boolean;
-  /** Privy finished restoring its session. Before this, `address` means nothing. */
+  /** Privy finished restoring its session. Before this, a Privy `address` means nothing. */
   ready: boolean;
   authenticated: boolean;
-  /** The embedded Solana wallet, base58. Case-sensitive: never upper-case it. */
+  /**
+   * `privy` is the embedded wallet. `mobile` is a phone wallet that signed
+   * the server's message. `off` is signed out. When both exist, `mobile` wins
+   * until the shopper starts a Privy login.
+   */
+  kind: 'off' | 'privy' | 'mobile';
+  /** The Solana address, base58. Case-sensitive: never upper-case it. */
   address: string | null;
   email: string | null;
   login: () => void;
+  /** Connect a phone wallet, sign the server challenge, and keep that address. */
+  loginMobile: () => Promise<void>;
   logout: () => Promise<void>;
-  /** Privy access token, for /api/session/login. */
+  /** Privy access token, for /api/session/login. Null for a phone wallet. */
   accessToken: () => Promise<string | null>;
   /**
    * Sign a serialized transaction with the embedded wallet, without sending
@@ -41,9 +49,11 @@ export const WALLET_OFF: WalletState = {
   enabled: false,
   ready: true,
   authenticated: false,
+  kind: 'off',
   address: null,
   email: null,
   login: () => {},
+  loginMobile: async () => {},
   logout: async () => {},
   accessToken: async () => null,
   signTransaction: missing,

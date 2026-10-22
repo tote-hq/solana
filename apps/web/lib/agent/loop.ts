@@ -7,6 +7,7 @@ import type { ChatImage } from '../chat-image.ts';
 import type { UiEvent } from '../protocol';
 import { earlyLocationAsk } from './early-ask';
 import { changuitoPrompt, stateBanner } from './prompt';
+import { classifyTopic, offTopicRefusal } from './topic-guard.ts';
 import { anthropicProvider } from './providers/anthropic';
 import { openaiProvider } from './providers/openai';
 import type { HopResult } from './providers/types';
@@ -125,6 +126,33 @@ export async function runTurn(
   image?: ChatImage,
 ): Promise<{ brain: string }> {
   const t0 = Date.now();
+
+  // Before early-ask and before the model. An off-topic message is not a
+  // basket, so it must not become the postal-code question and it must not
+  // open a tool. Ambiguous grocery talk falls through; see topic-guard.ts.
+  if (classifyTopic(userText, { hasImage: Boolean(image) }) === 'refuse') {
+    const reply = offTopicRefusal(lang, userText);
+    const location = session.state.getLocation();
+    const cart = turn.cache.cart;
+    turn.messages.push(
+      {
+        role: 'user',
+        content: shopperTurn(
+          userText,
+          stateBanner({
+            retailer: location?.retailer,
+            postalCode: location?.postalCode,
+            cartLines: cart?.lines.length,
+            cartTotal: cart?.total.display,
+          }),
+          image,
+        ),
+      },
+      { role: 'assistant', content: [{ type: 'text', text: reply }] },
+    );
+    emit({ t: 'text', delta: reply });
+    return { brain: 'topic-guard' };
+  }
 
   // Before the model: see early-ask.ts.
   const ask = earlyLocationAsk({

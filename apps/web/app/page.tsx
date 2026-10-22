@@ -59,16 +59,21 @@ export default async function Home() {
                 </HumanGate>
                 <footer className="app-footer">
                   <FounderTrust />
+                  {/* Tools stay one group: social, the privacy link from main,
+                      and the language switch. Powered by is the centre lockup. */}
                   <div
                     className="app-footer-tools"
                     role="group"
                     aria-label={inLang(lang, {
-                      es: 'Redes y idioma',
-                      en: 'Social profiles and language',
+                      es: 'Redes, privacidad e idioma',
+                      en: 'Social profiles, privacy, and language',
                     })}
                   >
                     <FooterSocial />
                     <span className="app-footer-rule" aria-hidden="true" />
+                    <a className="app-legal" href="/privacidad">
+                      {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                    </a>
                     <LangToggle />
                   </div>
                   <PoweredBy />
