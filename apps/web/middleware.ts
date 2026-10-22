@@ -28,8 +28,14 @@ export async function middleware(req: NextRequest) {
 
   const path = req.nextUrl.pathname;
 
+  // Account deletion is gated by the session cookie and the confirm string
+  // (app/api/account/delete). The human cookie lasts less long than the
+  // session; a shopper whose Turnstile check expired must still be able to
+  // delete. SameSite=Lax keeps that POST on this site.
+  const sessionOnly = path === '/api/account/delete';
+
   // Conservative non-browser reject on APIs (keep UI fetch working).
-  if (path.startsWith('/api/') && path !== '/api/human') {
+  if (path.startsWith('/api/') && path !== '/api/human' && !sessionOnly) {
     if (!hasBrowserFetchHints(req)) {
       return humansOnly('Changuito es solo para personas.');
     }
