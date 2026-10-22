@@ -27,6 +27,7 @@ import checkout
 from sandbox import BASE, NO_REPLACE, REPLACE, SECRET_FIELDS, Sandbox, Secrets, Snapshot
 
 PHASES = ("login", "empty_cart", "shop", "checkout", "payment")
+STALL_WAITS = 8  # consecutive "wait" picks before a phase counts as stuck
 PAGE_KINDS = {
     "login_form": "A login form asking for DNI, email or password",
     "store_page": "Store home or category page",
@@ -167,6 +168,7 @@ async def jev_loop(run: Run, phase: str, items: list[str], done_items: list[str]
     sb = run.sb
     run.failures.clear()
     was_in_popup = False
+    waits = 0
     print(f"\n== jev: {phase} ==")
     print(f"{'#':>2}  {'page_kind':<15} {'done':>5}  {'action':<56} {'p':>5} {'jev ms':>6}")
     while run.step < run.max_steps:
@@ -225,6 +227,14 @@ async def jev_loop(run: Run, phase: str, items: list[str], done_items: list[str]
             short = label
         print(f"{step:>2}  {a['page_kind'].choice:<15} {a['phase_done'].noul:>5.2f}  "
               f"{short[:56]:<56} {conf:>5.2f} {ms:>6.0f}")
+
+        # A page that needs this many waits in a row is stuck, not loading: stop instead of using up
+        # max_steps. Counted on the picks alone, since the login popup's text flickers while it sits there.
+        waits = waits + 1 if action == "wait" else 0
+        if waits >= STALL_WAITS:
+            run.error = f"stuck in {phase}: {STALL_WAITS} waits in a row"
+            print(f"    ✗ {run.error}")
+            break
 
         if run.jsonl and sb.tracing:  # the jsonl follows the trace: nothing before login, nothing near a card
             run.jsonl.write(json.dumps({
@@ -471,4 +481,5 @@ async def run(args: argparse.Namespace) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(line_buffering=True)  # a run redirected to a file can be followed live
     sys.exit(asyncio.run(run(parse_args())))
