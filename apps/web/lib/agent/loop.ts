@@ -7,6 +7,7 @@ import type { ChatImage } from '../chat-image.ts';
 import type { UiEvent } from '../protocol';
 import { earlyLocationAsk } from './early-ask';
 import { changuitoPrompt, stateBanner } from './prompt';
+import { classifyTopic, topicRefusal } from './topic-guard';
 import { anthropicProvider } from './providers/anthropic';
 import { openaiProvider } from './providers/openai';
 import type { HopResult } from './providers/types';
@@ -126,9 +127,33 @@ export async function runTurn(
 ): Promise<{ brain: string }> {
   const t0 = Date.now();
 
+  const location = session.state.getLocation();
+  const cart = turn.cache.cart;
+  const banner = stateBanner({
+    retailer: location?.retailer,
+    postalCode: location?.postalCode,
+    cartLines: cart?.lines.length,
+    cartTotal: cart?.total.display,
+  });
+
+  // Before the postal-code shortcut and before any tool schema is loaded.
+  // An off-topic message is not a search that has not started yet; asking
+  // for a postcode, or spending a hop on it, would be answering it. See
+  // topic-guard.ts. The reply is written into the transcript the same way
+  // early-ask's question is, so the next turn still has a valid pairing.
+  if (classifyTopic(userText) === 'refuse') {
+    const reply = topicRefusal(lang, userText);
+    turn.messages.push(
+      { role: 'user', content: shopperTurn(userText, banner, image) },
+      { role: 'assistant', content: [{ type: 'text', text: reply }] },
+    );
+    emit({ t: 'text', delta: reply });
+    return { brain: 'topic-guard' };
+  }
+
   // Before the model: see early-ask.ts.
   const ask = earlyLocationAsk({
-    hasLocation: Boolean(session.state.getLocation()),
+    hasLocation: Boolean(location),
     firstMessage: turn.messages.length === 0,
     text: userText,
     lang,
@@ -147,21 +172,9 @@ export async function runTurn(
   const mcpTools = await mcpToolsToAnthropic(session.client);
   const tools = [...mcpTools, ...RENDER_TOOLS];
 
-  const location = session.state.getLocation();
-  const cart = turn.cache.cart;
-
   turn.messages.push({
     role: 'user',
-    content: shopperTurn(
-      userText,
-      stateBanner({
-        retailer: location?.retailer,
-        postalCode: location?.postalCode,
-        cartLines: cart?.lines.length,
-        cartTotal: cart?.total.display,
-      }),
-      image,
-    ),
+    content: shopperTurn(userText, banner, image),
   });
 
   // The server's own instructions, then ours. Cached: both are stable for the
