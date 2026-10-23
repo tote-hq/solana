@@ -32,6 +32,7 @@ import { readSessionUser, sessionMismatchResponse } from '../../../../lib/sessio
 import { canonicalReceipt } from '../../../../lib/order.ts';
 import { manualStatus, recordManualEvent, resolveManualFee, sandboxRequest } from '../../../../lib/checkout/manual-server.ts';
 import { validManualEvent } from '../../../../lib/checkout/manual-policy.ts';
+import { recoverOpenAttempt } from '../../../../lib/checkout/open-recovery.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -80,6 +81,7 @@ export async function GET(req: Request): Promise<Response> {
   if (rec.checkoutKind === 'manual_fee_v1') {
     let current = rec;
     try {
+      current = await recoverOpenAttempt(rec);
       if (rec.jobId) {
         const result = await sandboxRequest(`/jobs/${rec.jobId}`);
         const event = result.ok ? await result.json() : null;

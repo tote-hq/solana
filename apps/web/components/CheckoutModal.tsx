@@ -9,6 +9,7 @@ import { track } from '../lib/analytics';
 import type { Receipt } from '../lib/chat-store.ts';
 import { escrowCopy } from '../lib/checkout/copy.ts';
 import type { QuoteResponse, StatusResponse } from '../lib/checkout/types.ts';
+import { OpenConfirmationPending, recoverOpen, submitOpen, type OpenSubmission } from '../lib/checkout/open-submission.ts';
 import type { PublicProfile } from '../lib/profile.ts';
 import { fetchAs } from '../lib/fetch-as.ts';
 import { ensureUserCookie } from '../lib/session-login';
@@ -95,6 +96,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   const [error, setError] = useState<string | null>(null);
   const [funding, setFunding] = useState(false);
   const [openSig, setOpenSig] = useState<string | null>(null);
+  const [pendingOpen, setPendingOpen] = useState<OpenSubmission | null>(null);
   const [dia, setDia] = useState<DiaLogin>(EMPTY_LOGIN);
   // The saved profile (lib/profile.ts), without its password. When it is
   // complete the server decrypts it at /api/checkout/start and nothing is typed.
@@ -191,7 +193,8 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
 
   const lock = useCallback(async () => {
     if (!quote || !wallet.address) return;
-    if (!ready) {
+    const pending = pendingOpen?.orderId === quote.orderId ? pendingOpen : null;
+    if (!ready && !pending) {
       setError(copy.diaMissing);
       return;
     }
@@ -202,26 +205,32 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
       // The server builds `open` with the resolver paying the fee; the wallet
       // signs as the buyer and the server co-signs and sends.
       if (!fundedSig) {
-        const built = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/open', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ orderId: quote.orderId }),
-        });
-        const unsigned = await built.json().catch(() => null);
-        if (!built.ok) throw new Error(unsigned?.error ?? copy.failed);
-        const signed = await wallet.signTransaction(Uint8Array.from(atob(unsigned.tx), (c) => c.charCodeAt(0)));
-        const sent = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/open', {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ orderId: quote.orderId, tx: btoa(String.fromCharCode(...signed)) }),
-        });
-        const opened = await sent.json().catch(() => null);
-        if (!sent.ok) throw new Error(opened?.error ?? copy.failed);
-        fundedSig = opened.openSig as string;
+        let submission = pending;
+        if (!submission) {
+          const built = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/open', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ orderId: quote.orderId }),
+          });
+          const unsigned = await built.json().catch(() => null);
+          if (!built.ok) throw new Error(unsigned?.error ?? copy.failed);
+          const signed = await wallet.signTransaction(Uint8Array.from(atob(unsigned.tx), (c) => c.charCodeAt(0)));
+          submission = { orderId: quote.orderId, tx: btoa(String.fromCharCode(...signed)) };
+          setPendingOpen(submission);
+        }
+        const opened = await submitOpen((url, init) => fetchAs({ address: wallet.address, sign: wallet.accessToken }, url, init), submission, copy.failed);
+        fundedSig = opened.openSig;
+        setPendingOpen(null);
         const sig = fundedSig;
         setOpenSig(sig);
         track('escrow_open');
         track('pay_open');
+        if (manual && opened.status) {
+          setStatus(opened.status);
+          setStep('shopping');
+          refresh();
+          return;
+        }
       }
       const sig = fundedSig;
       const res = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/start', {
@@ -242,7 +251,11 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     } catch (e) {
       console.warn('[checkout] lock failed', e);
       track('failure', { code: lockFailureCode(e instanceof Error ? e.message : '') });
-      setError(e instanceof Error && e.message ? e.message : copy.failed);
+      setError(e instanceof OpenConfirmationPending
+        ? (lang === 'en' ? 'Your wallet approval was received, but confirmation is still pending. We are checking this order. You do not need to sign or pay again.'
+          : 'Recibimos la aprobación de tu billetera, pero falta confirmar el pedido. Lo estamos consultando. No hace falta volver a firmar ni pagar.')
+        : e instanceof Error && e.message ? e.message : copy.failed);
+      if (!(e instanceof OpenConfirmationPending)) setPendingOpen(null);
       if (manual && fundedSig) {
         setStatus({ orderId: quote.orderId, checkoutKind: 'manual_fee_v1', stage: 'shopping', phase: 'queued', payment: null,
           storeOrderId: null, openSig: fundedSig, closeSig: null, handoffUrl: null, amountDisplay: '0.10', error: null,
@@ -251,7 +264,31 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
         setStep('shopping');
       } else setStep('review');
     }
-  }, [quote, wallet, dia, ready, copy.failed, copy.diaMissing, manual, openSig]);
+  }, [quote, wallet, dia, ready, copy.failed, copy.diaMissing, manual, openSig, pendingOpen, lang, refresh]);
+
+  // Confirmation can finish even when the PUT reply never reaches this tab.
+  // Poll only the existing order; never build or sign another lock here.
+  useEffect(() => {
+    if (!manual || !pendingOpen || step !== 'review' || pendingOpen.orderId !== quote?.orderId) return;
+    let stopped = false;
+    let inFlight = false;
+    const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      const recovered = await recoverOpen((url, init) => fetchAs({ address: wallet.address, sign: wallet.accessToken }, url, init), pendingOpen.orderId);
+      inFlight = false;
+      if (stopped || !recovered) return;
+      setOpenSig(recovered.openSig);
+      setPendingOpen(null);
+      setError(null);
+      setStatus(recovered.status!);
+      setStep('shopping');
+      refresh();
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), POLL_MS);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [manual, pendingOpen, quote?.orderId, step, wallet.address, wallet.accessToken, refresh]);
 
   // Poll while the sandbox shops.
   useEffect(() => {
@@ -479,9 +516,11 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
                     className="btn"
                     data-testid="checkout-lock"
                     onClick={() => void lock()}
-                    disabled={step === 'locking' || short || !balance || !ready}
+                    disabled={step === 'locking' || (!pendingOpen && (short || !balance || !ready))}
                   >
-                    {step === 'locking' ? copy.locking : manual ? (lang === 'en' ? 'Lock 0.10 test USDC and prepare checkout' : 'Bloquear 0,10 USDC de prueba y preparar el pago') : copy.lockCta(quote.amountDisplay)}
+                    {step === 'locking' ? (pendingOpen ? (lang === 'en' ? 'Checking confirmation…' : 'Consultando confirmación…') : copy.locking)
+                      : pendingOpen ? (lang === 'en' ? 'Check payment and resume' : 'Consultar pago y continuar')
+                      : manual ? (lang === 'en' ? 'Lock 0.10 test USDC and prepare checkout' : 'Bloquear 0,10 USDC de prueba y preparar el pago') : copy.lockCta(quote.amountDisplay)}
                   </button>
                 </div>
               )}

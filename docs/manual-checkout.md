@@ -41,6 +41,12 @@ shopper polling. `GET` recovers funded orders that never reached `/start`, using
 the regular authenticated jobs API. Shopper credentials travel only in the
 server-to-server job request, not in the dispatch response or checkout record.
 
+The server persists the co-signed transaction identity before broadcasting.
+An interrupted confirmation request is recovered only after the on-chain order
+matches the buyer, amount and basket. A lost browser response triggers status
+reconciliation; a retry reuses the same signed transaction and order instead of
+requesting another wallet approval. Unconfirmed attempts alone never start jobs.
+
 An earned fee uses receipt basis `checkout-prepared/v1`. A worker restart loses
 its Chromium process: pre-preparation jobs refund; prepared jobs keep the earned
 fee and report the interrupted purchase as unknown. Unknown payment results

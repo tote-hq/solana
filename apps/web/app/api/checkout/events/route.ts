@@ -4,6 +4,7 @@ import { db } from '../../../../lib/db.ts';
 import type { CheckoutRecord } from '../../../../lib/checkout/store.ts';
 import { startManual } from '../../../../lib/checkout/manual-start.ts';
 import { readOrder } from '../../../../lib/checkout/escrow-server.ts';
+import { recoverOpenAttempt } from '../../../../lib/checkout/open-recovery.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,10 +15,16 @@ export async function GET(req: Request): Promise<Response> {
   if (!workerAuthorized(req.headers.get('authorization'))) return new Response(null, { status: 401 });
   try {
     const rows = await db()`select record from manual_checkout
-      where record->>'openSig' is not null and record->>'jobId' is null and record->>'outcome' is null
-      order by updated_at limit 1`;
-    const rec = rows[0]?.record as CheckoutRecord | undefined;
-    if (rec) {
+      where (record->>'openSig' is not null or record->>'openAttemptSig' is not null)
+        and record->>'jobId' is null and record->>'outcome' is null
+      order by (record->>'openSig' is not null) desc, updated_at limit 2`;
+    for (const row of rows) {
+      const rec = await recoverOpenAttempt(row.record as CheckoutRecord);
+      if (!rec.openSig) {
+        // Rotate unconfirmed attempts so they cannot hide a funded order.
+        await db()`update manual_checkout set updated_at=now() where order_id=${rec.orderId}`;
+        continue;
+      }
       const order = await readOrder(rec.orderId);
       const expired = order && (order.status !== 'open' || order.deadline <= Date.now() / 1000 + 60);
       const result = expired ? null : await startManual(rec, null);
@@ -29,6 +36,7 @@ export async function GET(req: Request): Promise<Response> {
           if (latest) await resolveManualFee(latest);
         }
       }
+      break;
     }
     return Response.json({ ok: true });
   } catch { return Response.json({ ok: false }, { status: 202 }); }
