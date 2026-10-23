@@ -19,9 +19,9 @@ const WS = RPC.replace(/^http/, 'ws');
  * login. The wallet only signs; the server pays the fee and sends (see
  * app/api/checkout/open).
  *
- * Google is omitted inside an Android WebView (the Seeker WebShell). The
- * shell sends accounts.google.com to system Chrome, and the OAuth verifier
- * never makes the trip. See `privyLoginMethods`.
+ * Google stays available inside the Seeker WebShell. The app keeps
+ * accounts.google.com and auth.privy.io in the WebView and strips the
+ * WebView user-agent tokens. See `privyLoginMethods`.
  *
  * A phone wallet (Mobile Wallet Adapter) is registered in the browser only,
  * and can sign in even when this build has no Privy app id. `registerMwa`
@@ -204,9 +204,9 @@ function Bridge({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * First paint offers email and Google, which is what a browser gets.
- * After mount, a WebView drops Google. Ordinary browsers get the same
- * list back and do not re-render.
+ * First paint offers email and Google. After mount the same list comes
+ * back for browsers and for the Seeker WebShell, so the modal does not
+ * drop Google.
  */
 function useShellLoginMethods(): PrivyLoginMethod[] {
   const [methods, setMethods] = useState<PrivyLoginMethod[]>(['email', 'google']);

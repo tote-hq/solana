@@ -48,7 +48,7 @@ function jpegSize(buf: Buffer): { w: number; h: number } {
 test('each public route has a unique title, description and canonical', () => {
   assert.deepEqual(
     PUBLIC_PAGES.map((page) => page.path),
-    ['/', '/whitelist', '/reportarbug'],
+    ['/', '/whitelist', '/reportarbug', '/stats'],
   );
   const titles = PUBLIC_PAGES.map((page) => documentTitle(page.title));
   const descriptions = PUBLIC_PAGES.map((page) => page.description);
@@ -114,6 +114,7 @@ test('sitemap lists only the public marketing routes', () => {
     'https://www.changuito.me',
     'https://www.changuito.me/whitelist',
     'https://www.changuito.me/reportarbug',
+    'https://www.changuito.me/stats',
   ]);
   assert.equal(urls.some((url) => url.includes('/api/')), false);
   assert.equal(urls.some((url) => url.includes('app.changuito.me')), false);

@@ -153,10 +153,10 @@ orders table.
 ## Wallet: Privy embedded wallet, resolver-paid fees
 
 - Login is Privy email or Google (`@privy-io/react-auth` 3.47,
-  `loginMethods: ['email', 'google']`). Inside an Android WebView — the Seeker
-  app built with `solana-mobile webshell` — Google is omitted
-  (`lib/privy-login.ts`): that shell opens `accounts.google.com` in system
-  Chrome, and the OAuth verifier stored in the WebView cannot follow it.
+  `loginMethods: ['email', 'google']`). The Seeker app
+  (`me.changuito.sol`, `lib/privy-login.ts`) keeps `accounts.google.com` and
+  `auth.privy.io` inside its WebView and strips `; wv` and `Version/4.0`,
+  so Continue with Google is shown there as well as in a browser.
   Email and the phone wallet stay. A Solana embedded wallet is created on
   first login.
 - The wallet **only signs**: `wallet.signTransaction` (Privy

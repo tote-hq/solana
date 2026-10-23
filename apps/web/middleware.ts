@@ -20,6 +20,10 @@ function humansOnly(message: string) {
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+  // Public stats. No session, no bot wall: the page is meant to be opened.
+  if (path === '/stats' || path.startsWith('/stats/')) {
+    return NextResponse.next();
+  }
   // The exact service endpoint enforces its bearer credential in both handlers.
   // Its worker has no browser fetch hints or Turnstile session cookie.
   if (isCheckoutServiceCallback(path, req.method)) {

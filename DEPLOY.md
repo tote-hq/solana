@@ -27,8 +27,8 @@ Devnet only. There is no mainnet configuration and no network switch.
 In the Privy dashboard, for the app whose id you will use:
 
 1. **Login methods → Email** and **Google** on. The provider also passes
-   `loginMethods: ['email', 'google']` (email only inside the Seeker WebShell;
-   see `apps/web/lib/privy-login.ts`), so anything else enabled there is not
+   `loginMethods: ['email', 'google']`, including inside the Seeker WebShell
+   (`apps/web/lib/privy-login.ts`), so anything else enabled there is not
    offered.
 2. **Embedded wallets → Solana** on, **create on login for all users**.
    Ethereum embedded wallets off.
