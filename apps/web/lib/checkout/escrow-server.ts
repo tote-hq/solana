@@ -17,7 +17,8 @@ const TREASURY_TOKEN = address(DEPLOYMENTS.devnet.treasuryToken);
 
 export async function readOrder(orderIdHex: string): Promise<OrderAccount | null> {
   const pda = await orderPda(PROGRAM, hexToBytes(orderIdHex));
-  const { value } = await rpc().getAccountInfo(pda, { encoding: 'base64', commitment: 'confirmed' }).send();
+  const { value } = await rpc().getAccountInfo(pda, { encoding: 'base64', commitment: 'confirmed' })
+    .send({ abortSignal: AbortSignal.timeout(8_000) });
   if (!value || value.owner !== PROGRAM) return null;
   return decodeOrder(Uint8Array.from(Buffer.from(value.data[0], 'base64')));
 }

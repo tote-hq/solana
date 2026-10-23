@@ -37,9 +37,11 @@ import { manualMember, manualAvailable } from '../../../../lib/checkout/manual-s
 import { getConfig, flagOn } from '../../../../lib/config.ts';
 import { serviceOrderId, SERVICE_FEE_UNITS } from '../../../../lib/checkout/manual-policy.ts';
 import { hexToBytes } from '../../../../lib/escrow.ts';
+import { recoverOpenAttempt } from '../../../../lib/checkout/open-recovery.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 90;
 
 const toB64 = (b: Uint8Array) => Buffer.from(b).toString('base64');
 
@@ -60,7 +62,7 @@ async function load(req: Request) {
 export async function POST(req: Request): Promise<Response> {
   const got = await load(req);
   if (!got.ok) return got.res;
-  const { rec } = got;
+  const rec = await recoverOpenAttempt(got.rec);
   if (rec.openSig) return Response.json({ error: 'Ese pedido ya está bloqueado.' }, { status: 409 });
   if (rec.checkoutKind === 'manual_fee_v1') {
     if (!flagOn(await getConfig(), 'manual_checkout_enabled') || !await manualMember(rec.buyer) || !await manualAvailable()) {
@@ -104,7 +106,7 @@ export async function POST(req: Request): Promise<Response> {
 export async function PUT(req: Request): Promise<Response> {
   const got = await load(req);
   if (!got.ok) return got.res;
-  const { rec } = got;
+  const rec = await recoverOpenAttempt(got.rec);
   if (rec.openSig) return Response.json({ openSig: rec.openSig });
   if (typeof got.tx !== 'string' || !rec.openMessage) {
     return Response.json({ error: 'Falta la firma.' }, { status: 400 });
@@ -128,10 +130,12 @@ export async function PUT(req: Request): Promise<Response> {
   const resolver = await resolverSigner();
   const signed = await partiallySignTransaction([resolver.keyPair], tx);
   const sig = getSignatureFromTransaction(signed);
+  rec.openAttemptSig = sig;
+  await checkoutStore().set(rec);
   try {
     await rpc()
       .sendTransaction(getBase64EncodedWireTransaction(signed), { encoding: 'base64', preflightCommitment: 'confirmed' })
-      .send();
+      .send({ abortSignal: AbortSignal.timeout(12_000) });
     await waitFor(sig);
   } catch (err) {
     console.error('[checkout/open]', err);

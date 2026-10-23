@@ -52,6 +52,8 @@ export interface CheckoutRecord {
    * browser sends back.
    */
   openMessage?: string;
+  /** Server-derived transaction identity, persisted before broadcasting. Not proof of funding. */
+  openAttemptSig?: string;
   openSig?: string;
   /** Last phase the sandbox reported. */
   phase?: string;

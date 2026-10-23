@@ -73,11 +73,13 @@ export async function waitFor(sig: string, url: string = rpcUrl(), timeoutMs = 6
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     // Public devnet answers 429 freely; a throttled poll is a pause, not a failure.
-    const res = await r.getSignatureStatuses([sig as never]).send().catch(() => null);
+    const res = await r.getSignatureStatuses([sig as never])
+      .send({ abortSignal: AbortSignal.timeout(Math.max(1, Math.min(8_000, until - Date.now()))) }).catch(() => null);
     const s = res?.value[0];
     if (s?.err) throw new Error(`transaction failed: ${JSON.stringify(s.err, (_, v) => (typeof v === 'bigint' ? String(v) : v))}`);
     if (s && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized')) return;
-    await new Promise((res) => setTimeout(res, 1500));
+    const pause = Math.min(1500, until - Date.now());
+    if (pause > 0) await new Promise((res) => setTimeout(res, pause));
   }
   throw new Error(`transaction ${sig} not confirmed in ${timeoutMs / 1000}s`);
 }
