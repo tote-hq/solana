@@ -30,6 +30,10 @@ async def main():
         async def events():
             return {'resolved': True}
 
+        @app.get('/fixture-events')
+        async def dispatch():
+            return {'ok': True}
+
         @app.get('/fixture-parent')
         async def parent():
             return HTMLResponse('''<iframe src="http://127.0.0.1:18080/viewer/" width="1200" height="850"></iframe>''')

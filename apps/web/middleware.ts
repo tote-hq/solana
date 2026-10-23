@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { isCheckoutServiceCallback } from './lib/service-callback';
 
 import {
   AI_BOT_UA,
@@ -18,6 +19,14 @@ function humansOnly(message: string) {
 }
 
 export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname;
+  // The exact service endpoint enforces its bearer credential in both handlers.
+  // Its worker has no browser fetch hints or Turnstile session cookie.
+  if (isCheckoutServiceCallback(path, req.method)) {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
   const ua = req.headers.get('user-agent') ?? '';
   if (AI_BOT_UA.test(ua)) {
     return new NextResponse('Solo humanos.', {
@@ -25,8 +34,6 @@ export async function middleware(req: NextRequest) {
       headers: { 'content-type': 'text/plain; charset=utf-8', ...PRIVATE_NO_STORE },
     });
   }
-
-  const path = req.nextUrl.pathname;
 
   // Account deletion is gated by the session cookie and the confirm string
   // (app/api/account/delete). The human cookie lasts less long than the
