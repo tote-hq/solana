@@ -142,12 +142,22 @@ def shipping_total(of: dict) -> int | None:
     return None
 
 
-async def set_shipping(sb: Sandbox) -> dict:
+async def set_shipping(sb: Sandbox, strict: bool = False) -> dict:
     """Attach an address and a delivery option. The account's saved address wins; the job's
     postcode and street are the fallback. Billing follows delivery (VTEX's default)."""
     of = await order_form(sb)
     sd = of.get("shippingData") or {}
     addr = sd.get("address") if _complete(sd.get("address")) else None
+    if strict:
+        pc = sb.secrets.get('postcode')
+        candidates = [a for a in [addr, *sd.get('availableAddresses', [])]
+                      if a and _complete(a) and a.get('postalCode') == pc]
+        if sb.secrets.get('street') and sb.secrets.get('number'):
+            addr = await _address_from_secrets(sb)
+        else:
+            addr = candidates[0] if candidates else None
+        if not addr:
+            return {'ok': False, 'how': 'approved address unavailable', 'shipping_centavos': None}
     how = "current address"
     if not addr:
         saved = [a for a in sd.get("availableAddresses", []) if _complete(a)]
@@ -574,6 +584,44 @@ async def pay(sb: Sandbox, job_card: dict | None) -> dict:
     print(f"    hosts aborted after pay: {', '.join(hosts) or 'none'}")
     await describe_frames(page)
     return {"payment": "error", "detail": "no answer from the store 90 s after pressing pay"}
+
+
+async def prepare_manual(sb: Sandbox, lines: list[dict]) -> None:
+    """Validate the complete basket/delivery and expose only an empty new-card form."""
+    from collections import Counter
+    of = await order_form(sb)
+    expected = Counter()
+    actual = Counter()
+    for line in lines:
+        if not line.get('sku'):
+            raise RuntimeError('manual checkout requires SKU identifiers')
+        expected[str(line['sku'])] += line['quantity']
+    for item in of.get('items', []):
+        actual[str(item['id'])] += item['quantity']
+    if actual != expected:
+        raise RuntimeError('basket differs from approved items')
+    sd = of.get('shippingData') or {}
+    if (sd.get('address') or {}).get('postalCode') != sb.secrets.get('postcode'):
+        raise RuntimeError('delivery postcode differs from quote')
+    logistics = sd.get('logisticsInfo') or []
+    if len(logistics) != len(of.get('items', [])) or any(
+            not info.get('selectedSla') or info.get('selectedDeliveryChannel') != 'delivery'
+            for info in logistics):
+        raise RuntimeError('complete home delivery unavailable')
+    if not await _select_group(sb.main, 'debit'):
+        raise RuntimeError('payment method unavailable')
+    await _use_new_card(sb.main, 'debit')
+    root = await _card_root(sb.main, 5000)
+    if not root:
+        raise RuntimeError('fresh card form unavailable')
+    pan = await _find(root, 'pan')
+    if pan and await pan.input_value():
+        raise RuntimeError('card form is not empty')
+    # Refresh through the native client so the model receives the latest merchant keys.
+    await sb.main.evaluate('''async () => { await window.vtexjs.checkout.getOrderForm(); }''')
+    loaded = await sb.main.evaluate("() => typeof window.grecaptcha?.render === 'function' || typeof window.grecaptcha?.enterprise?.execute === 'function'")
+    if not loaded:
+        raise RuntimeError('native verification unavailable')
 
 
 async def _alerts(page: Page) -> list[str]:

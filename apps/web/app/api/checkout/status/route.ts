@@ -28,8 +28,10 @@ import { checkoutAlert, resolverFailureCode, resolverLogLine } from '../../../..
 import { readJob } from '../../../../lib/checkout/sandbox.ts';
 import { checkoutStore, type CheckoutRecord } from '../../../../lib/checkout/store.ts';
 import type { StatusResponse } from '../../../../lib/checkout/types.ts';
-import { readLoggedInUser } from '../../../../lib/login-gate.ts';
+import { readSessionUser, sessionMismatchResponse } from '../../../../lib/session-match.ts';
 import { canonicalReceipt } from '../../../../lib/order.ts';
+import { manualStatus, recordManualEvent, resolveManualFee, sandboxRequest } from '../../../../lib/checkout/manual-server.ts';
+import { validManualEvent } from '../../../../lib/checkout/manual-policy.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +67,8 @@ function noteAlert(rec: CheckoutRecord): void {
 }
 
 export async function GET(req: Request): Promise<Response> {
-  const user = await readLoggedInUser(req);
+  const user = await readSessionUser(req);
+  if (!user.ok && user.mismatch) return sessionMismatchResponse(req);
   if (!user.ok) return Response.json({ error: 'Iniciá sesión.' }, { status: 401 });
 
   const orderId = new URL(req.url).searchParams.get('orderId') ?? '';
@@ -74,6 +77,21 @@ export async function GET(req: Request): Promise<Response> {
   const store = checkoutStore();
   const rec = await store.get(orderId);
   if (!rec || rec.buyer !== user.address) return Response.json({ error: 'No encontramos ese pedido.' }, { status: 404 });
+  if (rec.checkoutKind === 'manual_fee_v1') {
+    let current = rec;
+    try {
+      if (rec.jobId) {
+        const result = await sandboxRequest(`/jobs/${rec.jobId}`);
+        const event = result.ok ? await result.json() : null;
+        if (validManualEvent(event) && event.order_id === rec.orderId && event.job_id === rec.jobId) {
+          current = await recordManualEvent(event) ?? rec;
+        }
+      }
+      await resolveManualFee(current);
+    } catch { /* A lost worker is not proof of failure; durable outbox retries. */ }
+    current = await store.get(rec.orderId) ?? current;
+    return Response.json(manualStatus(current), { headers: { 'cache-control': 'no-store' } });
+  }
 
   if (rec.outcome) return reply(rec, rec.outcome === 'settled' ? 'done' : 'refunded');
   if (!rec.jobId) return reply(rec, 'quoted');

@@ -1,5 +1,8 @@
 # changuito sandbox
 
+For the optional embedded browser and preparation-fee flow, see
+[manual checkout](../../docs/manual-checkout.md). It is disabled by default.
+
 A Jev + Playwright worker that logs into the shopper's Día account, fills the
 cart with an escrowed basket by SKU, picks the delivery, and pays with the
 operator's card. The service holds neither: each job brings the shopper's

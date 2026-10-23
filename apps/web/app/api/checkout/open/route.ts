@@ -29,10 +29,14 @@ import { openFailureMessage } from '../../../../lib/checkout/failure.ts';
 import { openTransaction } from '../../../../lib/checkout/open-tx.ts';
 import { checkoutStore } from '../../../../lib/checkout/store.ts';
 import { DEPLOYMENTS } from '../../../../lib/deployments.ts';
-import { readLoggedInUser } from '../../../../lib/login-gate.ts';
+import { readSessionUser, sessionMismatchResponse } from '../../../../lib/session-match.ts';
 import { DEFAULT_TIMEOUT_SECS } from '../../../../lib/order.ts';
 import { resolverSigner } from '../../../../lib/server/resolver.ts';
 import { rpc, waitFor } from '../../../../lib/solana.ts';
+import { manualMember, manualAvailable } from '../../../../lib/checkout/manual-server.ts';
+import { getConfig, flagOn } from '../../../../lib/config.ts';
+import { serviceOrderId, SERVICE_FEE_UNITS } from '../../../../lib/checkout/manual-policy.ts';
+import { hexToBytes } from '../../../../lib/escrow.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,7 +44,8 @@ export const dynamic = 'force-dynamic';
 const toB64 = (b: Uint8Array) => Buffer.from(b).toString('base64');
 
 async function load(req: Request) {
-  const user = await readLoggedInUser(req);
+  const user = await readSessionUser(req);
+  if (!user.ok && user.mismatch) return { ok: false, res: sessionMismatchResponse(req) } as const;
   if (!user.ok) return { ok: false, res: Response.json({ error: 'Iniciá sesión para pagar.' }, { status: 401 }) } as const;
   const body = (await req.json().catch(() => null)) as { orderId?: unknown; tx?: unknown } | null;
   const orderId = typeof body?.orderId === 'string' && /^[0-9a-f]{64}$/.test(body.orderId) ? body.orderId : null;
@@ -57,12 +62,23 @@ export async function POST(req: Request): Promise<Response> {
   if (!got.ok) return got.res;
   const { rec } = got;
   if (rec.openSig) return Response.json({ error: 'Ese pedido ya está bloqueado.' }, { status: 409 });
+  if (rec.checkoutKind === 'manual_fee_v1') {
+    if (!flagOn(await getConfig(), 'manual_checkout_enabled') || !await manualMember(rec.buyer) || !await manualAvailable()) {
+      return Response.json({ error: 'El pago manual no está disponible.' }, { status: 503 });
+    }
+    if (rec.amount !== SERVICE_FEE_UNITS || !rec.orderNonce
+        || await serviceOrderId(rec.buyer, hexToBytes(rec.orderNonce)) !== rec.orderId) {
+      return Response.json({ error: 'Comisión inválida.' }, { status: 409 });
+    }
+  }
 
   // Rebuilt on every call: a retry after the blockhash expired gets a fresh
   // one, and the order id makes a second `open` fail on chain regardless.
   const wire = await openTransaction(
     rec.buyer,
     {
+      checkoutKind: rec.checkoutKind,
+      orderNonce: rec.orderNonce,
       programId: DEPLOYMENTS.devnet.programId,
       usdcMint: DEPLOYMENTS.devnet.usdcMint,
       orderId: rec.orderId,
@@ -73,6 +89,13 @@ export async function POST(req: Request): Promise<Response> {
     DEPLOYMENTS.devnet.resolver,
   );
   const tx = getTransactionDecoder().decode(wire);
+  if (rec.checkoutKind === 'manual_fee_v1') {
+    try {
+      const simulation = await rpc().simulateTransaction(toB64(wire) as never,
+        { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true }).send();
+      if (simulation.value.err) return Response.json({ error: 'No pudimos simular la comisión.' }, { status: 502 });
+    } catch { return Response.json({ error: 'No pudimos simular la comisión.' }, { status: 502 }); }
+  }
   rec.openMessage = toB64(Uint8Array.from(tx.messageBytes));
   await checkoutStore().set(rec);
   return Response.json({ tx: toB64(wire) });

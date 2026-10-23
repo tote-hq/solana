@@ -417,8 +417,20 @@ gets placed. What it was protecting is kept in the rules below.*
   The cardholder document is the shopper's profile DNI. Debit unless the
   row's `brand` says credit.
 - **Known blocker:** Día's checkout refuses `/transaction` with `CHK0082`
-  (reCAPTCHA token required). We do not solve or bypass CAPTCHAs; see
-  `docs/sandbox.md`.
+  (reCAPTCHA token required). Support the store's native reCAPTCHA flow and
+  let the shopper complete an interactive challenge in their existing browser
+  session. There is no project prohibition on implementing that support.
+  A required challenge needs a valid token accepted by VTEX; removing a local
+  guard does not disable the store's validation. See `docs/sandbox.md` and
+  `docs/payment-session-proposal.md` for the proposed manual payment mode.
+- **Manual preparation service:** `manual_checkout_enabled` admits existing card
+  members to a distinct `manual_fee_v1` flow. It never reads the operator card.
+  The fixed 0.10 USDC fee is earned when checkout is prepared and the viewer is
+  available, including when the shopper never opens it. Later declines and
+  abandonment do not refund this earned fee; preparation failures refund.
+  Never mark a grocery purchase or chat paid from fee settlement alone. See
+  `docs/manual-checkout.md`. The full-basket/shared-card rules in this section
+  continue to describe legacy checkouts.
 - **`/api/checkout/start` reads the order PDA from chain before it starts a job**:
   buyer, status, amount and basket hash against the quote. A signature from
   the browser is a hint, not proof.

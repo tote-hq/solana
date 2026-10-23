@@ -19,7 +19,11 @@ import type { Cart } from '@changuito/mcp/types';
 import { quoteRate } from '../../../../lib/checkout/rate.ts';
 import { NO_DELIVERY, quoteShipping, type ShippingLocation } from '../../../../lib/checkout/shipping.ts';
 import { checkoutStore } from '../../../../lib/checkout/store.ts';
-import { sandboxFlags } from '../../../../lib/config.ts';
+import { sandboxFlags, getConfig, flagOn } from '../../../../lib/config.ts';
+import { manualAvailable, manualStatus } from '../../../../lib/checkout/manual-server.ts';
+import { MANUAL_KIND, SERVICE_FEE_CENTS, serviceOrderId, VIEWER_SECONDS } from '../../../../lib/checkout/manual-policy.ts';
+import { hasDatabase, db } from '../../../../lib/db.ts';
+import type { CheckoutRecord } from '../../../../lib/checkout/store.ts';
 import { getProfile } from '../../../../lib/profile.ts';
 import { cardAccess, checkoutMode } from '../../../../lib/shared-card.ts';
 import type { QuoteResponse } from '../../../../lib/checkout/types.ts';
@@ -60,11 +64,38 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'El changuito está vacío.' }, { status: 400 });
   }
 
+  // Resume funded sessions across a full app reload without another fee lock.
+  const currentHash = bytesToHex(await basketHash(cart));
+  if (hasDatabase()) {
+    try {
+      const rows = await db()`select record from manual_checkout where record->>'buyer'=${user.address}
+        and record->>'basketHash'=${currentHash} and (record->>'openSig' is not null or record->>'jobId' is not null)
+        and (record->'manual'->>'sessionActive'='true' or
+          (record->>'outcome' is null and (record->'manual'->>'preparedAt') is null))
+        order by updated_at desc limit 1`;
+      const rec = rows[0]?.record as CheckoutRecord | undefined;
+      if (rec) return Response.json({
+        checkoutKind: MANUAL_KIND, orderId: rec.orderId, orderNonce: rec.orderNonce, feeReleaseBasis: 'checkout_prepared',
+        viewerDurationSecs: VIEWER_SECONDS, amount: rec.amount, amountCents: 10, amountDisplay: '0.10',
+        basketHash: rec.basketHash, timeoutSecs: DEFAULT_TIMEOUT_SECS, arsPerUsd: rec.arsPerUsd,
+        rateSource: rec.rateSource ?? '', subtotalCentavos: cart.total.centavos, shippingCentavos: rec.shippingCentavos ?? 0,
+        totalCentavos: cart.total.centavos + (rec.shippingCentavos ?? 0), postalCode: rec.postalCode,
+        postalSource: 'profile', chatPostalCode: null, programId: DEPLOYMENTS.devnet.programId,
+        usdcMint: DEPLOYMENTS.devnet.usdcMint, mode: 'live', resumeStatus: manualStatus(rec),
+      }, { headers: { 'cache-control': 'no-store' } });
+    } catch (err) { if ((err as { code?: string }).code !== '42P01') throw err; }
+  }
+
   // Only wallets on the card's member list pay with it (lib/shared-card.ts).
   // Everyone else gets the demo run: same lock, the mock stops at payment,
   // refund, and the cart link to finish in Día. Asked here so the modal can
   // say which run this is before anything is locked; the start asks again.
-  const mode = checkoutMode(await cardAccess(user.address, (await sandboxFlags()).mock));
+  const access = await cardAccess(user.address, (await sandboxFlags()).mock);
+  const mode = checkoutMode(access);
+  const manual = access === 'ok' && flagOn(await getConfig(), 'manual_checkout_enabled');
+  if (manual && (!hasDatabase() || !(await manualAvailable()))) {
+    return Response.json({ error: 'El navegador de pago no está disponible. Probá más tarde.' }, { status: 503 });
+  }
 
   // The postal code the shopper browsed with: prices, stock and envío are all quoted per area.
   // The profile's postcode wins over the chat's: it is where the shopper said
@@ -98,13 +129,20 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'No pudimos cotizar el envío o el cambio. Probá de nuevo en un rato.' }, { status: 503 });
   }
   const totalCentavos = cart.total.centavos + shipping.centavos;
-  const cents = arsToUsdCents(totalCentavos as never, rate.arsPerUsd, buffer()) as unknown as number;
-  const orderId = bytesToHex(newOrderId());
-  const hash = bytesToHex(await basketHash(cart));
+  const cents = manual ? SERVICE_FEE_CENTS : arsToUsdCents(totalCentavos as never, rate.arsPerUsd, buffer()) as unknown as number;
+  const nonce = newOrderId();
+  const orderId = manual ? await serviceOrderId(user.address, nonce) : bytesToHex(nonce);
+  const manualFields = manual ? {
+    checkoutKind: MANUAL_KIND, orderNonce: bytesToHex(nonce),
+    manual: { preparation: 'queued' as const, purchase: 'not_started' as const,
+      preparedAt: null, viewerExpiresAt: null, sessionActive: false, sequence: 0 },
+  } : {};
+  const hash = currentHash;
   const handoffUrl =
     typeof body.handoffUrl === 'string' && /^https:\/\//.test(body.handoffUrl) ? body.handoffUrl : null;
 
   await checkoutStore().set({
+    ...manualFields,
     orderId,
     buyer: user.address,
     amount: usdcToBase(cents).toString(),
@@ -123,6 +161,8 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   const res: QuoteResponse = {
+    ...(manual ? { checkoutKind: MANUAL_KIND, orderNonce: bytesToHex(nonce),
+      feeReleaseBasis: 'checkout_prepared' as const, viewerDurationSecs: VIEWER_SECONDS } : {}),
     orderId,
     amount: usdcToBase(cents).toString(),
     amountCents: cents,

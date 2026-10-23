@@ -29,13 +29,15 @@ import { cardAccess, checkoutCardFor, checkoutMode } from '../../../../lib/share
 import type { SandboxShopper } from '../../../../lib/checkout/sandbox.ts';
 import { checkoutStore } from '../../../../lib/checkout/store.ts';
 import type { StatusResponse } from '../../../../lib/checkout/types.ts';
-import { readLoggedInUser } from '../../../../lib/login-gate.ts';
+import { readSessionUser, sessionMismatchResponse } from '../../../../lib/session-match.ts';
+import { startManual } from '../../../../lib/checkout/manual-start.ts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request): Promise<Response> {
-  const user = await readLoggedInUser(req);
+  const user = await readSessionUser(req);
+  if (!user.ok && user.mismatch) return sessionMismatchResponse(req);
   if (!user.ok) return Response.json({ error: 'Iniciá sesión para pagar.' }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as {
@@ -50,6 +52,7 @@ export async function POST(req: Request): Promise<Response> {
   const store = checkoutStore();
   const rec = await store.get(orderId);
   if (!rec || rec.buyer !== user.address) return Response.json({ error: 'No encontramos ese pedido.' }, { status: 404 });
+  if (rec.checkoutKind === 'manual_fee_v1') return startManual(rec, body);
 
   if (!rec.jobId) {
     const flags = await sandboxFlags();

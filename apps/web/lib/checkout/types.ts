@@ -1,6 +1,11 @@
 /** Wire shapes shared by app/api/checkout/* and CheckoutModal. Types only. */
 
 export interface QuoteResponse {
+  checkoutKind?: 'manual_fee_v1';
+  orderNonce?: string;
+  feeReleaseBasis?: 'checkout_prepared';
+  viewerDurationSecs?: number;
+  resumeStatus?: StatusResponse;
   orderId: string;
   /** USDC base units (6 decimals), decimal string. */
   amount: string;
@@ -33,6 +38,9 @@ export interface QuoteResponse {
 export type CheckoutStage = 'quoted' | 'locked' | 'shopping' | 'done' | 'refunded';
 
 export interface StatusResponse {
+  checkoutKind?: 'manual_fee_v1';
+  manual?: import('./manual-policy.ts').ManualState;
+  feeStatus?: 'escrowed' | 'settlement_pending' | 'settled' | 'refund_pending' | 'refunded';
   orderId: string;
   stage: CheckoutStage;
   /** The sandbox phase while shopping: login, empty_cart, shop, checkout, payment. */

@@ -39,6 +39,13 @@ declare_id!("BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d");
 pub const MIN_TIMEOUT: i64 = 300; // 5 minutes
 pub const MAX_TIMEOUT: i64 = 30 * 24 * 60 * 60; // 30 days
 
+pub const SERVICE_FEE: u64 = 100_000;
+pub const SERVICE_DOMAIN: &[u8] = b"changuito/service-fee/v1";
+
+pub fn service_order_id(buyer: &Pubkey, nonce: &[u8; 32]) -> [u8; 32] {
+    solana_sha256_hasher::hashv(&[SERVICE_DOMAIN, buyer.as_ref(), nonce]).to_bytes()
+}
+
 pub const CONFIG_SEED: &[u8] = b"config";
 pub const ORDER_SEED: &[u8] = b"order";
 pub const VAULT_SEED: &[u8] = b"vault";
@@ -105,6 +112,58 @@ pub mod changuito_escrow {
             basket_hash,
             deadline: order.deadline,
         });
+        Ok(())
+    }
+
+    /// Preparation service fee, with a program-derived identity and fixed six-decimal amount.
+    pub fn open_service_fee(
+        ctx: Context<OpenServiceFee>,
+        order_id: [u8; 32],
+        nonce: [u8; 32],
+        basket_hash: [u8; 32],
+        timeout_secs: i64,
+    ) -> Result<()> {
+        require!(ctx.accounts.mint.decimals == 6, EscrowError::InvalidAmount);
+        let amount = SERVICE_FEE;
+        require!(order_id == service_order_id(&ctx.accounts.buyer.key(), &nonce), EscrowError::InvalidOrderId);
+        require!(
+            (MIN_TIMEOUT..=MAX_TIMEOUT).contains(&timeout_secs),
+            EscrowError::InvalidTimeout
+        );
+
+        let now = Clock::get()?.unix_timestamp;
+        let order = &mut ctx.accounts.order;
+        order.order_id = order_id;
+        order.buyer = ctx.accounts.buyer.key();
+        order.amount = amount;
+        order.basket_hash = basket_hash;
+        order.status = Status::Open;
+        order.opened_at = now;
+        order.deadline = now + timeout_secs;
+        order.receipt_hash = [0u8; 32];
+        order.bump = ctx.bumps.order;
+        order.vault_bump = ctx.bumps.vault;
+
+        token::transfer(
+            CpiContext::new(
+                Token::id(),
+                Transfer {
+                    from: ctx.accounts.buyer_token.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        emit!(Opened {
+            order_id,
+            buyer: order.buyer,
+            amount,
+            basket_hash,
+            deadline: order.deadline,
+        });
+        emit!(ServiceFeeOpened { order_id, buyer: order.buyer, amount, policy: 1 });
         Ok(())
     }
 
@@ -251,6 +310,37 @@ pub struct Open<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(order_id: [u8; 32])]
+pub struct OpenServiceFee<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = mint)]
+    pub config: Account<'info, Config>,
+    pub mint: Account<'info, Mint>,
+    #[account(mut, token::mint = mint, token::authority = buyer)]
+    pub buyer_token: Account<'info, TokenAccount>,
+    #[account(
+        init,
+        payer = buyer,
+        space = 8 + Order::INIT_SPACE,
+        seeds = [ORDER_SEED, order_id.as_ref()],
+        bump
+    )]
+    pub order: Account<'info, Order>,
+    #[account(
+        init,
+        payer = buyer,
+        seeds = [VAULT_SEED, order_id.as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = order
+    )]
+    pub vault: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct Settle<'info> {
     pub resolver: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = resolver @ EscrowError::NotAuthorized)]
@@ -360,4 +450,29 @@ pub enum EscrowError {
     InvalidTimeout,
     #[msg("basket hash does not match the opened order")]
     BasketMismatch,
+    #[msg("service order identity does not match buyer and nonce")]
+    InvalidOrderId,
+}
+
+#[event]
+pub struct ServiceFeeOpened {
+    pub order_id: [u8; 32],
+    pub buyer: Pubkey,
+    pub amount: u64,
+    pub policy: u8,
+}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+
+    #[test]
+    fn service_identity_is_scoped_and_stable() {
+        let buyer = Pubkey::new_from_array([1; 32]);
+        let nonce = [2; 32];
+        assert_eq!(service_order_id(&buyer, &nonce), service_order_id(&buyer, &nonce));
+        assert_ne!(service_order_id(&buyer, &nonce), service_order_id(&Pubkey::new_from_array([3; 32]), &nonce));
+        assert_ne!(service_order_id(&buyer, &nonce), service_order_id(&buyer, &[4; 32]));
+        assert_eq!(SERVICE_FEE, 100_000);
+    }
 }
