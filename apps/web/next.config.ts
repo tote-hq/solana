@@ -23,7 +23,17 @@ const config: NextConfig = {
   async rewrites() {
     // Some installers ask for /manifest.json. Next serves the manifest at
     // /manifest.webmanifest; this name points at the same document.
-    return [{ source: '/manifest.json', destination: '/manifest.webmanifest' }];
+    // stats.changuito.me serves the public dashboard at the apex.
+    return {
+      beforeFiles: [
+        {
+          source: '/',
+          has: [{ type: 'host', value: 'stats.changuito.me' }],
+          destination: '/stats',
+        },
+      ],
+      afterFiles: [{ source: '/manifest.json', destination: '/manifest.webmanifest' }],
+    };
   },
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   // `@changuito/mcp` is a workspace package of compiled ESM. It gets bundled
@@ -34,7 +44,7 @@ const config: NextConfig = {
   // Bundling it is only safe because `@changuito/mcp/server` has no reference
   // to the checkout module — not even a dynamic one, which a bundler would
   // resolve at build time anyway. See packages/mcp/src/server.ts.
-  transpilePackages: ['@changuito/mcp'],
+  transpilePackages: ['@changuito/mcp', '@changuito/stats'],
 
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
 

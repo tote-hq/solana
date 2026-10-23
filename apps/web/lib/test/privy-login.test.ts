@@ -40,10 +40,10 @@ describe('privy login methods inside a WebView', () => {
     assert.deepEqual(privyLoginMethods(undefined), ['email', 'google']);
   });
 
-  it('drops Google inside the Seeker WebShell and any Android WebView', () => {
+  it('keeps Google inside the Seeker WebShell and any Android WebView', () => {
     for (const ua of [SEEKER_WEB_SHELL, SEEKER_REDUCED, ANDROID_WEBVIEW, `Foo ${SOLANA_MOBILE_WEB_SHELL_MARKER}`]) {
       assert.equal(isEmbeddedAndroidWebView(ua), true, ua);
-      assert.deepEqual(privyLoginMethods(ua), ['email']);
+      assert.deepEqual(privyLoginMethods(ua), ['email', 'google']);
     }
   });
 

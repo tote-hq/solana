@@ -1,19 +1,16 @@
 /**
  * Which Privy login buttons the modal is allowed to show.
  *
- * Email OTP stays on this origin (Privy runs it in an iframe, which the
- * Seeker WebShell does not intercept). Google does not. `initLoginWithOAuth`
- * writes the PKCE verifier to this page's localStorage and then navigates the
- * main frame to accounts.google.com. The Solana Mobile WebShell
- * (android.webkit.WebView, user agent includes "Solana Mobile Web Shell")
- * keeps sol.changuito.me inside the app and sends every other host out via
- * Intent.ACTION_VIEW, so the callback returns in system Chrome, where
- * `privy:oauth:state` is missing and Privy shows "Authentication failed".
- * Google also rejects the WebView user agent (`disallowed_useragent`).
- * The phone wallet (Mobile Wallet Adapter) never leaves the page either.
+ * Email OTP stays on this origin. Google used to be omitted inside the
+ * Seeker WebShell: the shell sent accounts.google.com out via
+ * Intent.ACTION_VIEW, the PKCE verifier never followed, and Google rejected
+ * the WebView user agent (`disallowed_useragent`). `me.changuito.sol` now
+ * keeps accounts.google.com and auth.privy.io inside the WebView and strips
+ * `; wv` and `Version/4.0` from the user agent, so Continue with Google is
+ * offered there too.
  *
- * Desktop and mobile browsers keep both methods. The decision is the user
- * agent only — it is not an auth check.
+ * `isEmbeddedAndroidWebView` still recognises the shell. It is not an auth
+ * check, and it no longer removes a login method.
  */
 
 export const DEFAULT_PRIVY_LOGIN_METHODS = ['email', 'google'] as const;
@@ -37,7 +34,9 @@ export function isEmbeddedAndroidWebView(userAgent: string | null | undefined): 
 }
 
 export function privyLoginMethods(userAgent: string | null | undefined): PrivyLoginMethod[] {
-  if (isEmbeddedAndroidWebView(userAgent)) return ['email'];
+  // The shell marker and a raw Android WebView both get Google now. The
+  // parameter stays so login() can keep reading the agent at the click.
+  void userAgent;
   return ['email', 'google'];
 }
 

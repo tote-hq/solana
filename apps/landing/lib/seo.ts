@@ -66,6 +66,14 @@ export const PUBLIC_PAGES = [
     priority: 0.3,
     navLabel: 'Reportar un bug',
   },
+  {
+    path: '/stats',
+    title: 'Public Stats & On-Chain Metrics',
+    description: 'Verified on-chain and product metrics across Solana and Stellar.',
+    changeFrequency: 'daily',
+    priority: 0.7,
+    navLabel: 'Stats',
+  },
 ] as const;
 
 export type PublicPage = (typeof PUBLIC_PAGES)[number];
