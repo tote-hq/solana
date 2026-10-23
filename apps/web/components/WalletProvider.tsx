@@ -6,6 +6,7 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { MWA_ADDRESS_KEY } from '../lib/mwa-key.ts';
+import { currentUserAgent, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
 import { DEFAULT_RPC } from '../lib/solana.ts';
 import { WalletContext, type WalletState } from '../lib/use-wallet.ts';
 
@@ -18,12 +19,17 @@ const WS = RPC.replace(/^http/, 'ws');
  * login. The wallet only signs; the server pays the fee and sends (see
  * app/api/checkout/open).
  *
+ * Google is omitted inside an Android WebView (the Seeker WebShell). The
+ * shell sends accounts.google.com to system Chrome, and the OAuth verifier
+ * never makes the trip. See `privyLoginMethods`.
+ *
  * A phone wallet (Mobile Wallet Adapter) is registered in the browser only,
  * and can sign in even when this build has no Privy app id. `registerMwa`
  * is loaded from a click or this effect so the server render never evaluates
  * a package that touches `window`.
  */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const loginMethods = useShellLoginMethods();
   const rpcs = useMemo(
     () => ({
       'solana:devnet': {
@@ -47,7 +53,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={APP_ID}
       config={{
-        loginMethods: ['email', 'google'],
+        loginMethods,
         appearance: { walletChainType: 'solana-only', theme: 'light', accentColor: '#1f7a4d' },
         embeddedWallets: { solana: { createOnLogin: 'all-users' }, ethereum: { createOnLogin: 'off' } },
         solana: { rpcs: rpcs as never },
@@ -162,7 +168,9 @@ function Bridge({ children }: { children: React.ReactNode }) {
       email: mobile.mobileAddress ? null : (user?.email?.address ?? user?.google?.email ?? null),
       login: () => {
         mobile.clearMobile();
-        login();
+        // Read the user agent at the click. The provider config above catches
+        // up in an effect, and this override is what the modal actually shows.
+        login({ loginMethods: privyLoginMethods(currentUserAgent()) });
       },
       loginMobile: mobile.loginMobile,
       logout: async () => {
@@ -193,4 +201,18 @@ function Bridge({ children }: { children: React.ReactNode }) {
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+}
+
+/**
+ * First paint offers email and Google, which is what a browser gets.
+ * After mount, a WebView drops Google. Ordinary browsers get the same
+ * list back and do not re-render.
+ */
+function useShellLoginMethods(): PrivyLoginMethod[] {
+  const [methods, setMethods] = useState<PrivyLoginMethod[]>(['email', 'google']);
+  useEffect(() => {
+    const next = privyLoginMethods(currentUserAgent());
+    setMethods((prev) => (prev.length === next.length && prev.every((method, i) => method === next[i]) ? prev : next));
+  }, []);
+  return methods;
 }

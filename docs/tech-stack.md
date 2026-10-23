@@ -249,7 +249,8 @@ the only cluster, and it is a constant in the generated `lib/deployments.ts`.
 The app expects this configuration (dashboard.privy.io → your app):
 
 1. **Login methods:** email and Google. The provider also sets
-   `loginMethods: ['email', 'google']`, so other methods enabled in the
+   `loginMethods: ['email', 'google']` (email only inside the Seeker WebShell;
+   see `apps/web/lib/privy-login.ts`), so other methods enabled in the
    dashboard are not offered.
 2. **Embedded wallets → Solana:** on, created on login for all users. Ethereum
    embedded wallets off.
