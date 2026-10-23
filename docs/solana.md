@@ -152,13 +152,15 @@ orders table.
 
 ## Wallet: Privy embedded wallet, resolver-paid fees
 
-- Login is Privy email or Google (`@privy-io/react-auth` 3.47,
-  `loginMethods: ['email', 'google']`). The Seeker app
-  (`me.changuito.sol`, `lib/privy-login.ts`) keeps `accounts.google.com` and
-  `auth.privy.io` inside its WebView and strips `; wv` and `Version/4.0`,
-  so Continue with Google is shown there as well as in a browser.
-  Email and the phone wallet stay. A Solana embedded wallet is created on
-  first login.
+- Login is Privy email, Google or an external Solana wallet (`@privy-io/react-auth` 3.47,
+  `loginMethods: ['email', 'google', 'wallet']`) in browsers and the Seeker WebShell.
+  The Seeker app keeps `accounts.google.com` and `auth.privy.io` inside its
+  WebView and strips `; wv` and `Version/4.0`, preserving its Google login flow.
+  A Solana embedded wallet is created on
+  first login; external-wallet login uses the chosen external address for
+  balance, profile, session and checkout signing. The server accepts that
+  selection only when Privy lists it among the authenticated user's linked
+  Solana wallets. The separate phone-wallet sign-in remains available.
 - The wallet **only signs**: `wallet.signTransaction` (Privy
   `useSignTransaction`, `components/WalletProvider.tsx`, `lib/use-wallet.ts`),
   no send. Privy gas sponsorship is not used.

@@ -248,10 +248,11 @@ the only cluster, and it is a constant in the generated `lib/deployments.ts`.
 
 The app expects this configuration (dashboard.privy.io → your app):
 
-1. **Login methods:** email and Google. The provider also sets
-   `loginMethods: ['email', 'google']`, including inside the Seeker WebShell
-   (`apps/web/lib/privy-login.ts`), so other methods enabled in the
-   dashboard are not offered.
+1. **Login methods:** email, Google and external wallets, with Solana wallet
+   signup enabled. The provider sets `loginMethods: ['email', 'google', 'wallet']`
+   in browsers and inside the Seeker WebShell.
+   Solana connectors are enabled in the client. A selected wallet is also
+   checked against Privy's linked Solana accounts before a session is issued.
 2. **Embedded wallets → Solana:** on, created on login for all users. Ethereum
    embedded wallets off.
 3. **Gas sponsorship:** not needed. The wallet only signs `open`;

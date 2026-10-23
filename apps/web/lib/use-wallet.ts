@@ -19,7 +19,7 @@ export interface WalletState {
   ready: boolean;
   authenticated: boolean;
   /**
-   * `privy` is the embedded wallet. `mobile` is a phone wallet that signed
+   * `privy` is an embedded or linked external wallet authenticated by Privy. `mobile` is a phone wallet that signed
    * the server's message. `off` is signed out. When both exist, `mobile` wins
    * until the shopper starts a Privy login.
    */
@@ -34,7 +34,7 @@ export interface WalletState {
   /** Privy access token, for /api/session/login. Null for a phone wallet. */
   accessToken: () => Promise<string | null>;
   /**
-   * Sign a serialized transaction with the embedded wallet, without sending
+   * Sign a serialized transaction with the selected wallet, without sending
    * it. The server built it with the resolver as fee payer, and adds that
    * signature and sends. Resolves to the wire bytes with the buyer's signature.
    */
