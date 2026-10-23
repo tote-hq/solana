@@ -103,6 +103,14 @@ export async function openIx(p: {
   };
 }
 
+/** Fixed preparation fee; the program derives orderId from buyer + nonce again. */
+export async function openServiceFeeIx(p: Parameters<typeof openIx>[0] & { nonce: Uint8Array }): Promise<Instruction> {
+  if (p.amount !== 100_000n) throw new Error('invalid service fee');
+  const legacy = await openIx(p);
+  return { ...legacy, data: concat([217, 123, 223, 72, 239, 55, 134, 160],
+    bytes32(p.orderId, 'orderId'), bytes32(p.nonce, 'nonce'), bytes32(p.basketHash, 'basketHash'), getI64Encoder().encode(p.timeoutSecs)) };
+}
+
 export async function settleIx(p: {
   program: Address; resolver: Address; orderId: Uint8Array; treasuryToken: Address; buyer: Address;
   basketHash: Uint8Array; receiptHash: Uint8Array;

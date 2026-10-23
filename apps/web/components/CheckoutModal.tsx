@@ -17,6 +17,7 @@ import { useBalances } from '../lib/use-balances.ts';
 import { useWallet } from '../lib/use-wallet.ts';
 import { useLang } from './LangProvider';
 import { PasswordInput } from './PasswordInput';
+import { ManualPaymentPanel } from './ManualPaymentPanel';
 
 /**
  * From a full basket to a settled escrow, in four steps:
@@ -128,6 +129,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
         const p = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/profile', { cache: 'no-store' }).catch(() => null);
         if (p?.ok) setProfile((await p.json().catch(() => null)) as PublicProfile | null);
         setQuote(body as QuoteResponse);
+        if (body.resumeStatus) { setStatus(body.resumeStatus); setOpenSig(body.resumeStatus.openSig); setStep('shopping'); }
       } catch (e) {
         setError(e instanceof Error ? e.message : copy.failed);
         quoting.current = false;
@@ -136,6 +138,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   }, [wallet.ready, wallet.address, wallet.accessToken, quote, cart, location, handoffUrl, copy.failed]);
 
   const short = Boolean(quote && balance && BigInt(balance.usdc) < BigInt(quote.amount));
+  const manual = quote?.checkoutKind === 'manual_fee_v1';
   const demo = quote?.mode === 'demo' || status?.mode === 'demo';
   // Only a run that logs into Día needs the login, and it has to be saved first.
   const needsDia = Boolean(quote) && !demo && (!profile?.complete || editing);
@@ -194,29 +197,34 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     }
     setStep('locking');
     setError(null);
+    let fundedSig: string | null = openSig;
     try {
       // The server builds `open` with the resolver paying the fee; the wallet
       // signs as the buyer and the server co-signs and sends.
-      const built = await fetch('/api/checkout/open', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ orderId: quote.orderId }),
-      });
-      const unsigned = await built.json().catch(() => null);
-      if (!built.ok) throw new Error(unsigned?.error ?? copy.failed);
-      const signed = await wallet.signTransaction(Uint8Array.from(atob(unsigned.tx), (c) => c.charCodeAt(0)));
-      const sent = await fetch('/api/checkout/open', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ orderId: quote.orderId, tx: btoa(String.fromCharCode(...signed)) }),
-      });
-      const opened = await sent.json().catch(() => null);
-      if (!sent.ok) throw new Error(opened?.error ?? copy.failed);
-      const sig = opened.openSig as string;
-      setOpenSig(sig);
-      track('escrow_open');
-      track('pay_open');
-      const res = await fetch('/api/checkout/start', {
+      if (!fundedSig) {
+        const built = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/open', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ orderId: quote.orderId }),
+        });
+        const unsigned = await built.json().catch(() => null);
+        if (!built.ok) throw new Error(unsigned?.error ?? copy.failed);
+        const signed = await wallet.signTransaction(Uint8Array.from(atob(unsigned.tx), (c) => c.charCodeAt(0)));
+        const sent = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/open', {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ orderId: quote.orderId, tx: btoa(String.fromCharCode(...signed)) }),
+        });
+        const opened = await sent.json().catch(() => null);
+        if (!sent.ok) throw new Error(opened?.error ?? copy.failed);
+        fundedSig = opened.openSig as string;
+        const sig = fundedSig;
+        setOpenSig(sig);
+        track('escrow_open');
+        track('pay_open');
+      }
+      const sig = fundedSig;
+      const res = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, '/api/checkout/start', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -235,9 +243,15 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
       console.warn('[checkout] lock failed', e);
       track('failure', { code: lockFailureCode(e instanceof Error ? e.message : '') });
       setError(e instanceof Error && e.message ? e.message : copy.failed);
-      setStep('review');
+      if (manual && fundedSig) {
+        setStatus({ orderId: quote.orderId, checkoutKind: 'manual_fee_v1', stage: 'shopping', phase: 'queued', payment: null,
+          storeOrderId: null, openSig: fundedSig, closeSig: null, handoffUrl: null, amountDisplay: '0.10', error: null,
+          mode: 'live', alert: null, feeStatus: 'escrowed', manual: { preparation: 'queued', purchase: 'not_started',
+            preparedAt: null, viewerExpiresAt: null, sessionActive: false, sequence: 0 } });
+        setStep('shopping');
+      } else setStep('review');
     }
-  }, [quote, wallet, dia, ready, copy.failed, copy.diaMissing]);
+  }, [quote, wallet, dia, ready, copy.failed, copy.diaMissing, manual, openSig]);
 
   // Poll while the sandbox shops.
   useEffect(() => {
@@ -245,7 +259,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
     let stopped = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/checkout/status?orderId=${quote.orderId}`, { cache: 'no-store' });
+        const res = await fetchAs({ address: wallet.address, sign: wallet.accessToken }, `/api/checkout/status?orderId=${quote.orderId}`, { cache: 'no-store' });
         const body = (await res.json().catch(() => null)) as StatusResponse | null;
         if (stopped || !res.ok || !body) return;
         setStatus(body);
@@ -253,7 +267,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
           alerted.current = body.alert;
           track('failure', { code: body.alert });
         }
-        if (body.stage === 'done' || body.stage === 'refunded') {
+        if (body.checkoutKind !== 'manual_fee_v1' && (body.stage === 'done' || body.stage === 'refunded')) {
           setStep(body.stage);
           track(body.stage === 'done' ? 'escrow_settled' : 'escrow_refunded', {});
           if (body.stage === 'done') track('settle');
@@ -274,7 +288,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [step, quote, refresh]);
+  }, [step, quote, refresh, wallet.address, wallet.accessToken]);
 
   // A finished demo files the chat as completed too, so the demo has an end:
   // the basket becomes a receipt like a real purchase would. The amount says
@@ -378,13 +392,15 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
                   </div>
                 ) : null}
               </dl>
-              <p className="ck-note">{copy.rateNote(quote.rateSource)}</p>
+              <p className="ck-note">{manual ? (lang === 'en' ? 'DIA charges groceries and delivery separately in pesos. The final amount is reviewed in DIA.' : 'DIA cobra los productos y el envío aparte, en pesos. Revisá el importe final en DIA.') : copy.rateNote(quote.rateSource)}</p>
               {quote.postalSource === 'profile' && quote.chatPostalCode && quote.chatPostalCode !== quote.postalCode ? (
                 <p className="ck-note" data-testid="checkout-postal-note">
                   {copy.postalNote(quote.postalCode, quote.chatPostalCode)}
                 </p>
               ) : null}
-              <p className="ck-note">{copy.escrowNote}</p>
+              <p className="ck-note" data-testid="manual-fee-disclosure">{manual ? (lang === 'en'
+                ? 'Lock 0.10 test USDC for checkout preparation. The fee is charged when the browser is ready, even if you never open it, abandon, or DIA declines payment. You then have 15 minutes to pay DIA with your own card. Preparation failures refund the fee.'
+                : 'Bloqueás 0,10 USDC de prueba por preparar el pago. La comisión se cobra cuando el navegador está listo, aunque no lo abras, abandones o DIA rechace el pago. Tenés 15 minutos para pagar en DIA con tu tarjeta. Si falla la preparación, devolvemos la comisión.') : copy.escrowNote}</p>
 
               {demo ? (
                 <p className="ck-note ck-demo" data-testid="checkout-demo-note">
@@ -465,14 +481,16 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
                     onClick={() => void lock()}
                     disabled={step === 'locking' || short || !balance || !ready}
                   >
-                    {step === 'locking' ? copy.locking : copy.lockCta(quote.amountDisplay)}
+                    {step === 'locking' ? copy.locking : manual ? (lang === 'en' ? 'Lock 0.10 test USDC and prepare checkout' : 'Bloquear 0,10 USDC de prueba y preparar el pago') : copy.lockCta(quote.amountDisplay)}
                   </button>
                 </div>
               )}
             </div>
           ) : null}
 
-          {step === 'shopping' ? (
+          {step === 'shopping' && manual && quote ? <ManualPaymentPanel orderId={quote.orderId} status={status} onUpdate={setStatus} /> : null}
+
+          {step === 'shopping' && !manual ? (
             <div className="ck-pay" data-testid="checkout-shopping-step">
               <p className="ck-ok">{copy.lockedNote}</p>
               <p className="ck-waiting" role="status" data-testid="checkout-phase">

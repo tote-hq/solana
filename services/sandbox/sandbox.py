@@ -9,6 +9,11 @@ action, the sandbox types the value, and every known value is redacted from what
 from __future__ import annotations
 
 import json
+import os
+import pwd
+import shutil
+import tempfile
+from pathlib import Path
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
@@ -40,8 +45,8 @@ ALLOWED_HOSTS = (
     # The card form: VTEX's card-ui iframe and the gateway that tokenizes the card.
     "vtexpayments.com.br",
     "mercadopago.com", "mlstatic.com",  # Día's card connector loads Mercado Pago's secure fields
-    # VTEX checkout asks reCAPTCHA v3 for a token before it creates the transaction; without it
-    # POST /transaction answers 403 and the UI retries forever.
+    # Allow VTEX's native reCAPTCHA scripts and challenges (checkbox or score-based).
+    # A missing/invalid token can make POST /transaction return CHK0082 and the UI retry.
     "www.google.com", "recaptcha.net",
 )
 
@@ -225,6 +230,7 @@ class Snapshot:
 @dataclass
 class Sandbox:
     headed: bool = False
+    manual: bool = False
     blocked_requests: list[str] = field(default_factory=list)
     order_attempts: list[str] = field(default_factory=list)
     browser: Browser | None = None
@@ -238,8 +244,23 @@ class Sandbox:
     record_dir: str | None = None
 
     async def start(self, pw: Playwright) -> None:
+        isolation = {}
+        if self.manual:
+            wrapper = os.environ.get('MANUAL_CHROMIUM_WRAPPER')
+            if not wrapper:
+                raise RuntimeError('manual browser isolation is not configured')
+            # The worker is serialized. Remove only abandoned profiles belonging
+            # to its dedicated browser UID, never legacy/root-owned profiles.
+            browser_uid = pwd.getpwnam('browser').pw_uid
+            for profile in Path(tempfile.gettempdir()).glob('playwright_chromiumdev_profile-*'):
+                if not profile.is_symlink() and profile.is_dir() and profile.stat().st_uid == browser_uid:
+                    shutil.rmtree(profile)
+            isolation = {'executable_path': wrapper, 'env': {
+                'PATH': '/usr/bin:/bin', 'DISPLAY': os.environ.get('DISPLAY', ':99'),
+                'CHROMIUM_BINARY': os.environ.get('MANUAL_CHROMIUM_BINARY', pw.chromium.executable_path),
+            }, 'args': ['--kiosk', '--disable-extensions']}
         self.browser = await pw.chromium.launch(
-            headless=not self.headed, channel="chromium", slow_mo=250 if self.headed else 0
+            headless=not self.headed, channel="chromium", slow_mo=250 if self.headed else 0, **isolation
         )
         video = {"record_video_dir": self.record_dir, "record_video_size": {"width": 1366, "height": 900}} \
             if self.record_dir else {}

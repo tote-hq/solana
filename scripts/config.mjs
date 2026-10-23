@@ -23,6 +23,9 @@ nextEnv.loadEnvConfig(join(ROOT, 'apps', 'web'), true, { info: () => {}, error: 
 
 /** What each known key does, so `set` can say what just changed. */
 const KNOWN = {
+  manual_checkout_enabled: (on) => on
+    ? 'eligible card members receive an embedded manual checkout with a preparation fee'
+    : 'new manual checkout admissions are disabled; existing sessions continue',
   sandbox_mock: (on) =>
     on
       ? 'new checkouts run on the in-process mock, even with SANDBOX_URL set'

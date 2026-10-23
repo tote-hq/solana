@@ -12,11 +12,13 @@ import {
 
 import { getTransferSolInstruction } from '@solana-program/system';
 
-import { hexToBytes, openIx, ORDER_SIZE } from '../escrow.ts';
+import { hexToBytes, openIx, openServiceFeeIx, ORDER_SIZE } from '../escrow.ts';
 import { rpc } from '../solana.ts';
 import { usdcAccount } from '../usdc.ts';
 
 export interface OpenArgs {
+  checkoutKind?: 'manual_fee_v1';
+  orderNonce?: string;
   programId: string;
   usdcMint: string;
   orderId: string;
@@ -45,7 +47,7 @@ export interface OpenArgs {
  * resolver co-signs only its own message holds.
  */
 export async function openTransaction(buyer: string, q: OpenArgs, feePayer: string = buyer): Promise<Uint8Array> {
-  const ix = await openIx({
+  const args = {
     program: address(q.programId),
     buyer: address(buyer),
     mint: address(q.usdcMint),
@@ -54,7 +56,10 @@ export async function openTransaction(buyer: string, q: OpenArgs, feePayer: stri
     amount: BigInt(q.amount),
     basketHash: hexToBytes(q.basketHash),
     timeoutSecs: BigInt(q.timeoutSecs),
-  });
+  };
+  const ix = q.checkoutKind === 'manual_fee_v1'
+    ? await openServiceFeeIx({ ...args, nonce: hexToBytes(q.orderNonce ?? '') })
+    : await openIx(args);
   const topUp = feePayer === buyer ? 0n : await rentShortfall(buyer);
   const ixs = topUp > 0n
     ? [

@@ -82,6 +82,11 @@ export function appContentSecurityPolicy(
 ): string {
   const isProd = nodeEnv === 'production';
   const vendors = analyticsCspSources(ids);
+  let viewer = '';
+  try {
+    const url = new URL(process.env.SANDBOX_URL ?? '');
+    if (url.protocol === 'https:' || (!isProd && ['localhost', '127.0.0.1'].includes(url.hostname))) viewer = ` ${url.origin}`;
+  } catch { /* no viewer configured */ }
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? '' : " 'unsafe-eval'"}${join(vendors.script)} ${TURNSTILE_ORIGIN}`,
@@ -96,7 +101,7 @@ export function appContentSecurityPolicy(
     // finishes the order on. 'self' is the dev fixture at /dev/checkout,
     // which stands in for a store that has no sandbox. This is the frames
     // *we* may open; being framed is still refused outright, below.
-    `frame-src 'self' ${TURNSTILE_ORIGIN} ${PRIVY.join(' ')} ${STOREFRONT_ORIGINS.join(' ')}`,
+    `frame-src 'self' ${TURNSTILE_ORIGIN} ${PRIVY.join(' ')} ${STOREFRONT_ORIGINS.join(' ')}${viewer}`,
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",

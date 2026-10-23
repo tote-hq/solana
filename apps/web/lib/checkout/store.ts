@@ -1,5 +1,7 @@
 import { hasDatabase } from '../db.ts';
 import { kvGet, kvSet } from '../kv.ts';
+import { db } from '../db.ts';
+import type { ManualState } from './manual-policy.ts';
 
 /**
  * A checkout between the quote and the settle: what the shopper was quoted,
@@ -14,6 +16,9 @@ import { kvGet, kvSet } from '../kv.ts';
  * and the buyer can refund on chain after the deadline without us.
  */
 export interface CheckoutRecord {
+  checkoutKind?: 'manual_fee_v1';
+  orderNonce?: string;
+  manual?: ManualState;
   /** Hex of the 32-byte order id. */
   orderId: string;
   buyer: string;
@@ -78,9 +83,29 @@ interface Store {
 function postgresStore(): Store {
   return {
     async get(orderId) {
-      return ((await kvGet(KEY(orderId))) as CheckoutRecord | undefined) ?? undefined;
+      const legacy = (await kvGet(KEY(orderId))) as CheckoutRecord | undefined;
+      if (legacy) return legacy;
+      // Manual orders have no cache expiry. During a rolling migration a missing
+      // table must not break legacy lookups, but manual writes still fail closed.
+      try {
+        const rows = await db()`select record from manual_checkout where order_id=${orderId}`;
+        return rows[0]?.record as CheckoutRecord | undefined;
+      } catch (err) {
+        if ((err as { code?: string }).code === '42P01') return undefined;
+        throw err;
+      }
     },
     async set(rec) {
+      if (rec.checkoutKind === 'manual_fee_v1') {
+        await db()`insert into manual_checkout(order_id,record) values(${rec.orderId},${db().json(rec as never)})
+          on conflict(order_id) do update set record = case
+            when manual_checkout.event_seq > ${rec.manual?.sequence ?? 0}
+            then manual_checkout.record || ${db().json(rec as never)} || jsonb_build_object(
+              'manual', manual_checkout.record->'manual', 'jobId', manual_checkout.record->'jobId',
+              'phase', manual_checkout.record->'phase', 'storeOrderId', manual_checkout.record->'storeOrderId')
+            else manual_checkout.record || ${db().json(rec as never)} end, updated_at=now()`;
+        return;
+      }
       await kvSet(KEY(rec.orderId), rec, TTL_SECONDS);
     },
   };

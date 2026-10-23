@@ -287,7 +287,8 @@ async def jev_loop(run: Run, phase: str, items: list[str], done_items: list[str]
 async def run_job(items: list[dict | str], *, secrets: dict | None = None, card: dict | None = None,
                   headed: bool = False,
                   trace: bool = False, max_steps: int = 60, min_confidence: float = 0.15,
-                  model: str | None = None, hold: float = 8.0, record: bool = False, on_phase=None) -> dict:
+                  model: str | None = None, hold: float = 8.0, record: bool = False, on_phase=None,
+                  on_manual=None) -> dict:
     """One sandbox run. Returns what changuito's job API reports (services/sandbox/server.py).
 
     `items` are `{name, quantity, sku?}` (a bare string is a name to search for). Lines with a SKU
@@ -296,8 +297,12 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
     (server.py `Card`). Both come from the job only. No card: the run stops at the payment step.
     `on_phase(name)` is called on entering each phase so a caller can show progress.
     """
+    if on_manual:
+        if card or trace or record:
+            raise ValueError('manual sessions cannot carry cards or recordings')
+        headed, hold = True, 0
     lines = [{"name": i, "quantity": 1, "sku": None} if isinstance(i, str) else i for i in items]
-    sb = Sandbox(headed=headed, secrets=Secrets.build(secrets), record_dir="traces/video" if record else None)
+    sb = Sandbox(headed=headed, manual=bool(on_manual), secrets=Secrets.build(secrets), record_dir="traces/video" if record else None)
     if record:
         print("!! --record: the video shows the card form as it is typed. Use a test card, delete the file after.")
     run = Run(sb=sb, client=AsyncTypeSafeClient(), headed=headed, model=model,
@@ -383,7 +388,9 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
                 raise _Stop
 
             enter("checkout")
-            ship = await checkout.set_shipping(sb)
+            ship = await checkout.set_shipping(sb, strict=bool(on_manual))
+            if on_manual and not ship['ok']:
+                raise RuntimeError('approved delivery unavailable')
             shipping_centavos = ship.get("shipping_centavos")
             print(f"    shipping: {ship['how']}" + (f"  (envío $ {shipping_centavos / 100:,.2f})"
                                                    if shipping_centavos is not None else ""))
@@ -401,7 +408,11 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
 
             enter("payment")
             await sb.stop_trace(trace_zip)  # never record the card form
-            pay = await checkout.pay(sb, card)
+            if on_manual:
+                await checkout.prepare_manual(sb, lines)
+                await on_manual(sb)
+            else:
+                pay = await checkout.pay(sb, card)
             print(f"    payment: {pay['payment']}" + (f" — {pay['detail']}" if pay.get("detail") else ""))
         except _Stop:
             pass

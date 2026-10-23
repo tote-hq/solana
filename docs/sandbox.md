@@ -1,5 +1,10 @@
 # Checkout sandbox
 
+The optional [manual checkout mode](manual-checkout.md) prepares this same
+browser for shopper-controlled payment and charges only a preparation fee.
+It defaults off. The full-basket/shared-card behavior below describes legacy
+checkouts, not manual service-fee orders.
+
 `services/sandbox` is the part of changuito that goes to the supermarket. After
 the shopper's USDC is locked in the escrow, it logs into **the shopper's own
 Día account** in a headless browser, empties the cart, adds the basket by SKU,
@@ -14,15 +19,21 @@ stops at the payment step, the order endpoints stay aborted at the network
 level, and the escrow refunds. The gate is the card itself, not a separate
 flag: a flag naming a resource can outlive the resource (CLAUDE.md §5).
 
-> **Known blocker (2026-10-10):** Día's checkout answers `POST
+> **Known blocker (confirmed in supplied logs from 2026-10-23):** Día's checkout answers `POST
 > /api/checkout/pub/orderForm/{id}/transaction` with **403 `CHK0082`
 > "ReCAPTCHA requerido"**. The card form is filled and Pay is pressed, but the
 > transaction is refused before the card is evaluated, so a real card does not
 > change the outcome. Headless and headed (Xvfb) runs both got it; no
 > reCAPTCHA frame loaded in either, and nothing on the allowlist was aborted
 > after Pay except `telemetry.vtex.com`. The run stops after 5 refusals and
-> refunds. We do not solve or bypass CAPTCHAs; the way forward is an
-> integration Día's checkout accepts.
+> refunds. Support for the store's native reCAPTCHA flow and manual shopper
+> completion is allowed. A public, unauthenticated browser probe on 2026-10-23
+> loaded `grecaptcha.render` under the current allowlist; the page selected
+> checkbox reCAPTCHA (`vtex.recaptchaV3` was `"false"`). This rules out a blanket
+> script block in that probe, but does not establish why the authenticated
+> payment failed. Inspect the live orderForm/key state and widget initialization
+> before expanding the allowlist. See the
+> [payment session and fee proposal](payment-session-proposal.md).
 
 ## Credit
 

@@ -1,0 +1,925 @@
+{
+  "address": "BFa1gZL9kVVo8Mq5gaDRM5RiCG4NDiyHLbpymfXvLz9d",
+  "metadata": {
+    "name": "changuito_escrow",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Escrow for a grocery basket paid in USDC on Solana"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "docs": [
+        "One-time setup. There is no admin and no way to change these later:",
+        "a resolver that could be swapped is a resolver that could be stolen."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "resolver",
+          "type": "pubkey"
+        },
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "open",
+      "docs": [
+        "The buyer locks `amount` of the configured mint against `order_id`.",
+        "An id can be opened once: `init` fails if the order already exists."
+      ],
+      "discriminator": [
+        228,
+        220,
+        155,
+        71,
+        199,
+        189,
+        60,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "buyer_token",
+          "writable": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "basket_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "timeout_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "open_service_fee",
+      "docs": [
+        "Preparation service fee, with a program-derived identity and fixed six-decimal amount."
+      ],
+      "discriminator": [
+        217,
+        123,
+        223,
+        72,
+        239,
+        55,
+        134,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "buyer_token",
+          "writable": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "basket_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "timeout_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "refund",
+      "docs": [
+        "Money back to the buyer. The resolver may refund at any time; the buyer",
+        "only once the deadline has passed. Anyone else is refused."
+      ],
+      "discriminator": [
+        2,
+        96,
+        183,
+        251,
+        63,
+        208,
+        46,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "Order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "Order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer_token",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "The resolver releases the vault to the treasury once checkout reached",
+        "the store's payment step. The basket hash must match what was opened."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "Order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "Order"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_token",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "basket_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "receipt_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Order",
+      "discriminator": [
+        134,
+        173,
+        223,
+        185,
+        77,
+        86,
+        28,
+        51
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Opened",
+      "discriminator": [
+        166,
+        172,
+        97,
+        9,
+        77,
+        76,
+        189,
+        109
+      ]
+    },
+    {
+      "name": "Refunded",
+      "discriminator": [
+        35,
+        103,
+        149,
+        246,
+        196,
+        123,
+        221,
+        99
+      ]
+    },
+    {
+      "name": "ServiceFeeOpened",
+      "discriminator": [
+        8,
+        87,
+        132,
+        251,
+        155,
+        173,
+        165,
+        65
+      ]
+    },
+    {
+      "name": "Settled",
+      "discriminator": [
+        232,
+        210,
+        40,
+        17,
+        142,
+        124,
+        145,
+        238
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "OrderClosed",
+      "msg": "the order is no longer open"
+    },
+    {
+      "code": 6001,
+      "name": "NotAuthorized",
+      "msg": "neither the resolver nor, after the deadline, the buyer"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidAmount",
+      "msg": "amount must be positive"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidTimeout",
+      "msg": "timeout must be between 5 minutes and 30 days"
+    },
+    {
+      "code": 6004,
+      "name": "BasketMismatch",
+      "msg": "basket hash does not match the opened order"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidOrderId",
+      "msg": "service order identity does not match buyer and nonce"
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Opened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "basket_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Order",
+      "docs": [
+        "Kept after the order closes, as the on-chain record of it. The vault is",
+        "what gets closed; this account costs ~0.002 SOL and is the receipt."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "basket_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "Status"
+              }
+            }
+          },
+          {
+            "name": "opened_at",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "receipt_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Refunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "self_service",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ServiceFeeOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "policy",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Settled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "receipt_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Status",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Refunded"
+          }
+        ]
+      }
+    }
+  ]
+}

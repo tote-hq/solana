@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIA checkout / Pago en DIA</title>
+<style>
+html,body{margin:0;height:100%;font:14px system-ui;background:#111827;color:#fff}
+body{display:flex;flex-direction:column}#screen{flex:1;min-height:0;overflow:auto}
+header{display:flex;gap:8px;align-items:center;padding:8px;flex-wrap:wrap}
+button,input{font:inherit;padding:8px;border:1px solid #9ca3af;border-radius:4px}
+input{width:140px}#status{flex:1}button{cursor:pointer}
+</style>
+<header>
+  <span id="status" role="status">Conectando / Connecting…</span>
+  <button id="reconnect" type="button">Reconectar / Reconnect</button>
+  <label>Teclado / Keyboard <input id="keyboard" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Teclado remoto / Remote keyboard"></label>
+  <button id="tab" type="button">Tab ↹</button>
+  <button id="backspace" type="button">⌫</button>
+</header>
+<div id="screen" aria-label="DIA checkout / Pago en DIA"></div>
+<script>window.viewerParents=__PARENTS__;</script>
+<script type="module" src="/viewer/viewer.js"></script>
+</html>
