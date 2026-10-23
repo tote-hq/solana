@@ -169,7 +169,8 @@ app = FastAPI(title="changuito sandbox", lifespan=lifespan)
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "busy": busy, "queued": queue.qsize(), 'manual_ready': await sessions.available()}
+    return {"ok": True, "busy": busy, "queued": queue.qsize(),
+            'callback_ready': sessions.callback_ready, 'manual_ready': await sessions.available()}
 
 
 @app.post("/jobs", dependencies=[Depends(auth)])

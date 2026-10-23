@@ -25,6 +25,7 @@ class ManualSessions:
         self.store: ManualStore | None = None
         self.active: str | None = None
         self.controllers: dict[str, WebSocket] = {}
+        self.callback_ready = False
 
     def start(self):
         data = os.environ.get('SANDBOX_DATA_DIR')
@@ -33,7 +34,7 @@ class ManualSessions:
             self.store.recover()
 
     async def available(self) -> bool:
-        if (not self.store or not parent_origins() or not os.environ.get('SANDBOX_CALLBACK_URL')
+        if (not self.store or not self.callback_ready or not parent_origins() or not os.environ.get('SANDBOX_CALLBACK_URL')
                 or not os.environ.get('SANDBOX_PUBLIC_URL')
                 or not Path(os.environ.get('MANUAL_CHROMIUM_WRAPPER', '/not-configured')).is_file()
                 or not (Path(__file__).parent / 'viewer' / 'dist' / 'viewer.js').is_file()):
@@ -180,11 +181,11 @@ class ManualSessions:
                     request = urllib.request.Request(os.environ['SANDBOX_CALLBACK_URL'],
                         headers={'authorization': 'Bearer ' + os.environ.get('SANDBOX_TOKEN', '')})
                     with urllib.request.urlopen(request, timeout=20) as response:
-                        response.read(1024)
+                        return response.status == 200 and json.load(response).get('ok') is True
                 try:
-                    await asyncio.to_thread(recover_start)
+                    self.callback_ready = await asyncio.to_thread(recover_start)
                 except Exception:
-                    pass
+                    self.callback_ready = False
                 for r in self.store.pending():
                     def send():
                         request = urllib.request.Request(

@@ -89,7 +89,9 @@ Retain one replica. The worker image bundles the viewer and starts Xvfb/VNC/API.
 
 Deploy migration and worker with the flag off; review and approve the concrete
 existing-program devnet upgrade, then deploy the compatible web application.
-Verify `/health` reports `manual_ready: true`. Before enabling, perform a
+Verify `/health` reports `manual_ready: true` and `callback_ready: true`.
+Manual readiness stays false while the authenticated callback is unavailable.
+Before enabling, perform a
 human-controlled DIA run covering login, exact basket/address, an empty card
 form, native CAPTCHA, any bank redirects, mobile input and expiry. Additional
 legitimate payment hosts may need allowlisting based on observed failures.
