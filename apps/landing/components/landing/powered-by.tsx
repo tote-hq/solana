@@ -1,7 +1,6 @@
-'use client';
+import { NEW_TAB_HINT } from '@changuito/trust';
 
-import { newTabHint } from '../lib/founder-trust-copy';
-import { useLang } from './LangProvider';
+import styles from './landing.module.css';
 
 /**
  * The three marks under "Powered by".
@@ -13,7 +12,7 @@ import { useLang } from './LangProvider';
  *
  * Each control is a link whose name is the organization. The picture is
  * decorative (`alt=""`) so the name is not spoken twice. The new-tab hint
- * matches the founder links and the social icons.
+ * matches the founder links.
  */
 const PARTNERS = [
   {
@@ -46,25 +45,22 @@ const PARTNERS = [
 ] as const;
 
 export function PoweredBy() {
-  const lang = useLang();
-  const hint = newTabHint(lang);
-
   return (
-    <div className="powered-by" role="group" aria-label="Powered by" data-testid="powered-by">
-      <span className="powered-by-label">Powered by</span>
-      <ul className="powered-by-list">
+    <div className={styles.poweredBy} role="group" aria-label="Powered by" data-testid="powered-by">
+      <span className={styles.poweredByLabel}>Powered by</span>
+      <ul className={styles.poweredByList}>
         {PARTNERS.map((partner) => (
           <li key={partner.id}>
             <a
-              className="powered-by-link"
+              className={styles.poweredByLink}
               href={partner.href}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`${partner.name} (${hint})`}
+              aria-label={`${partner.name} (${NEW_TAB_HINT})`}
               data-testid={`powered-by-${partner.id}`}
             >
               <img
-                className={partner.color ? 'powered-by-logo powered-by-logo-color' : 'powered-by-logo'}
+                className={partner.color ? `${styles.poweredByLogo} ${styles.poweredByLogoColor}` : styles.poweredByLogo}
                 src={partner.src}
                 alt=""
                 width={partner.width}

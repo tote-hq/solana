@@ -33,23 +33,18 @@ test('shopper footer social profiles match the landing accounts', () => {
   }
 
   const page = readFileSync(join(root, 'app/page.tsx'), 'utf8');
-  const footerStart = page.indexOf('<footer className="app-footer">');
+  const footerStart = page.indexOf('<footer className="app-footer"');
   const footerEnd = page.indexOf('</footer>', footerStart);
   const footer = page.slice(footerStart, footerEnd);
-  assert.equal(footer.split('<FounderTrust').length - 1, 1);
-  assert.equal(footer.split('<FooterSocial').length - 1, 1);
-  assert.ok(footer.indexOf('<FounderTrust') < footer.indexOf('<FooterSocial'));
+  assert.equal(footer.includes('FounderTrust'), false);
+  assert.equal(footer.includes('FooterSocial'), false);
+  assert.equal(footer.includes('PoweredBy'), false);
+  assert.equal(footer.includes('Hecho en'), false);
+  assert.match(footer, /\{COPYRIGHT_LINE\}/);
+  assert.match(footer, /<a className="app-legal" href="\/privacidad">/);
+  assert.match(footer, /<LangToggle \/>/);
   assert.equal(page.includes('https://x.com/appchanguito'), false);
   assert.equal(page.includes('instagram.com'), false);
-
-  const ui = readFileSync(join(root, 'components/FooterSocial.tsx'), 'utf8');
-  assert.equal(ui.includes('target="_blank"'), true);
-  assert.equal(ui.includes('rel="noopener noreferrer"'), true);
-  assert.equal(ui.includes('aria-label={`${link.ariaLabel}'), true);
-  assert.equal(ui.includes('Redes de Changuito'), true);
-  assert.equal(ui.includes('data-testid="app-social"'), true);
-  assert.equal(ui.includes('\u2014'), false);
-  assert.equal(ui.includes('\u2013'), false);
 
   const icons = readFileSync(join(root, 'components/icons.tsx'), 'utf8');
   assert.equal(icons.includes('export function InstagramIcon'), true);
@@ -57,17 +52,14 @@ test('shopper footer social profiles match the landing accounts', () => {
   assert.equal(icons.includes('aria-hidden'), true);
 
   const css = readFileSync(join(root, 'app/globals.css'), 'utf8');
-  assert.match(css, /\.app-social-link\s*\{[^}]*width:\s*44px;/s);
-  assert.match(css, /\.app-social-link\s*\{[^}]*height:\s*44px;/s);
-  assert.match(css, /\.app-social-link:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--chg-espresso\)/s);
-  assert.match(css, /@container app-footer \(max-width: 36rem\)/);
+  assert.equal(css.includes('.app-social-link'), false);
+  assert.equal(css.includes('.powered-by'), false);
+  assert.match(css, /\.app-legal\s*\{[^}]*min-height:\s*44px;/s);
+  assert.match(css, /\.app-lang\s*\{[^}]*min-height:\s*44px;/s);
+  assert.match(css, /\.app-legal:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--chg-espresso\)/s);
+  assert.match(css, /\.app-lang:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--chg-espresso\)/s);
 
   const bug = readFileSync(join(root, 'components/ReportBug.tsx'), 'utf8');
   assert.equal(bug.includes('Reportar un bug'), true);
   assert.equal(bug.includes('https://www.changuito.me/reportarbug'), true);
-
-  const trust = readFileSync(join(root, 'components/FounderTrust.tsx'), 'utf8');
-  assert.equal(trust.includes('simoneth.href'), true);
-  assert.equal(trust.includes('fabio.href'), true);
-  assert.equal(trust.includes('app-social'), false);
 });

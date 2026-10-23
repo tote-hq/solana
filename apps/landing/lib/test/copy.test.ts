@@ -75,7 +75,7 @@ test('footer social profiles point at @appchanguito', () => {
   assert.equal(footer.includes('noopener noreferrer'), true);
   assert.equal(footer.includes('aria-label={link.ariaLabel}'), true);
   assert.equal(footer.includes('LinkedInIcon'), true);
-  assert.equal(footer.includes('XIcon'), false);
+  assert.equal(footer.includes('XIcon'), true);
   assert.equal(footer.includes('https://x.com/appchanguito'), false);
   assert.equal(footer.includes('viewAsMember'), false);
   assert.equal(footer.split('SOCIAL.map').length - 1, 1);

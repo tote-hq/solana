@@ -9,11 +9,11 @@ import { useLang, useSetLang } from './LangProvider';
 /**
  * The way out of a language you do not read.
  *
- * It is in the footer with the social icons rather than the masthead on
- * purpose: the masthead is already two controls wide at 360px next to a
- * wordmark that shrinks, and a language switch is a thing you look for once
- * and then never again. The footer is where the "about this site" furniture
- * lives, which is what this is.
+ * It sits in the footer, next to the copyright and the privacy link,
+ * rather than the masthead on purpose: the masthead is already two controls
+ * wide at 360px next to a wordmark that shrinks, and a language switch is a
+ * thing you look for once and then never again. The footer is where the
+ * "about this site" furniture lives, which is what this is.
  *
  * ## The label is the destination, in the destination's language
  *

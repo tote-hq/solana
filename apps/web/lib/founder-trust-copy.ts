@@ -1,9 +1,11 @@
 /**
- * Shopper footer trust copy.
+ * Shopper footer copyright.
  *
- * The same words live in `@changuito/trust` for the landing. This file is a
- * copy so the shopper can ship without that package and without editing
- * `apps/landing`. Do not add a second copyright line next to `FounderTrust`.
+ * The landing prints the full trust line from `@changuito/trust` (copyright,
+ * then the founder sentence). This file keeps the same year and registered
+ * mark so the shopper can print `© 2026 Changuito®` without that package.
+ * The founder sentence constants stay so the two copies cannot drift; the
+ * shopper footer does not render them.
  */
 import type { Lang } from './lang.ts';
 

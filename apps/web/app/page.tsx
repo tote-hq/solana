@@ -1,9 +1,6 @@
 import { BetaOnboarding } from '../components/BetaOnboarding';
 import { Chat } from '../components/Chat';
 import { Deck } from '../components/Deck';
-import { FooterSocial } from '../components/FooterSocial';
-import { FounderTrust } from '../components/FounderTrust';
-import { PoweredBy } from '../components/PoweredBy';
 import { HumanGate } from '../components/HumanGate';
 import { LangProvider } from '../components/LangProvider';
 import { LangToggle } from '../components/LangToggle';
@@ -11,6 +8,7 @@ import { NetworkProvider } from '../components/NetworkProvider';
 import { ShopProvider } from '../components/ShopProvider';
 import { TopBar } from '../components/TopBar';
 import { WalletProvider } from '../components/WalletProvider';
+import { COPYRIGHT_LINE } from '../lib/founder-trust-copy';
 import { turnstileSiteKey } from '../lib/human-gate';
 import { inLang } from '../lib/lang.ts';
 import { langFromCookie } from '../lib/lang-server.ts';
@@ -57,26 +55,12 @@ export default async function Home() {
                 <HumanGate siteKey={siteKey}>
                   <Chat />
                 </HumanGate>
-                <footer className="app-footer">
-                  <FounderTrust />
-                  {/* Tools stay one group: social, the privacy link from main,
-                      and the language switch. Powered by is the centre lockup. */}
-                  <div
-                    className="app-footer-tools"
-                    role="group"
-                    aria-label={inLang(lang, {
-                      es: 'Redes, privacidad e idioma',
-                      en: 'Social profiles, privacy, and language',
-                    })}
-                  >
-                    <FooterSocial />
-                    <span className="app-footer-rule" aria-hidden="true" />
-                    <a className="app-legal" href="/privacidad">
-                      {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
-                    </a>
-                    <LangToggle />
-                  </div>
-                  <PoweredBy />
+                <footer className="app-footer" data-testid="app-footer">
+                  <span className="app-footer-copy">{COPYRIGHT_LINE}</span>
+                  <a className="app-legal" href="/privacidad">
+                    {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                  </a>
+                  <LangToggle />
                 </footer>
               </main>
             </Deck>
