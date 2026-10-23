@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import { ensureUserCookie, forgetUserCookie } from '../session-login.ts';
+import { WALLET_HEADER } from '../wallet-header.ts';
 
 const ADDRESS = 'So1anaTestAddress1111111111111111111111111';
 
@@ -41,6 +42,19 @@ describe('ensureUserCookie', () => {
     const body = JSON.parse(calls[0]!) as Record<string, unknown>;
     assert.deepEqual(Object.keys(body), ['token']);
     assert.equal(body.token, 'c2lnbmVk');
+  });
+
+  it('identifies the selected wallet in a header for server-side linked-wallet validation', async () => {
+    const original = globalThis.fetch;
+    let selected: string | null = null;
+    globalThis.fetch = async (_input, init) => {
+      selected = new Headers(init?.headers).get(WALLET_HEADER);
+      return new Response('{"ok":true}');
+    };
+    try {
+      assert.equal(await ensureUserCookie(ADDRESS, sign), true);
+      assert.equal(selected, ADDRESS);
+    } finally { globalThis.fetch = original; }
   });
 
   it('does not call the server when the wallet will not sign', async () => {

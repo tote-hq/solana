@@ -26,10 +26,11 @@ Devnet only. There is no mainnet configuration and no network switch.
 
 In the Privy dashboard, for the app whose id you will use:
 
-1. **Login methods → Email** and **Google** on. The provider also passes
-   `loginMethods: ['email', 'google']`, including inside the Seeker WebShell
-   (`apps/web/lib/privy-login.ts`), so anything else enabled there is not
-   offered.
+1. **Login methods → Email**, **Google**, and **External wallets** on; enable
+   **Solana wallets** and allow new wallet users to sign up. The provider passes
+   `loginMethods: ['email', 'google', 'wallet']` in browsers and the Seeker WebShell.
+   Solana external connectors are configured in `WalletProvider.tsx` without
+   automatic connection popups.
 2. **Embedded wallets → Solana** on, **create on login for all users**.
    Ethereum embedded wallets off.
 3. **Gas sponsorship** is not needed; leave it off. The wallet only signs

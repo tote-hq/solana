@@ -1,12 +1,13 @@
 'use client';
 
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
-import { useSignTransaction, useWallets } from '@privy-io/react-auth/solana';
+import { PrivyProvider, useLogin, usePrivy } from '@privy-io/react-auth';
+import { toSolanaWalletConnectors, useSignTransaction, useWallets } from '@privy-io/react-auth/solana';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { MWA_ADDRESS_KEY } from '../lib/mwa-key.ts';
-import { currentUserAgent, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
+import { currentUserAgent, DEFAULT_PRIVY_LOGIN_METHODS, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
+import { linkedSolanaWallet, restoredWalletSelection, selectedSolanaWallet, WALLET_SELECTION_KEY, type WalletSelection } from '../lib/privy-wallet.ts';
 import { DEFAULT_RPC } from '../lib/solana.ts';
 import { WalletContext, type WalletState } from '../lib/use-wallet.ts';
 
@@ -30,6 +31,7 @@ const WS = RPC.replace(/^http/, 'ws');
  */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const loginMethods = useShellLoginMethods();
+  const connectors = useMemo(() => toSolanaWalletConnectors({ shouldAutoConnect: false }), []);
   const rpcs = useMemo(
     () => ({
       'solana:devnet': {
@@ -54,9 +56,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       appId={APP_ID}
       config={{
         loginMethods,
-        appearance: { walletChainType: 'solana-only', theme: 'light', accentColor: '#1f7a4d' },
+        // Explicit ordering also overrides older dashboard layouts containing only email/Google.
+        loginMethodsAndOrder: { primary: ['email', 'google', 'detected_solana_wallets', 'phantom', 'solflare', 'backpack'] },
+        appearance: { walletChainType: 'solana-only', walletList: ['detected_solana_wallets', 'phantom', 'solflare', 'backpack'],
+          theme: 'light', accentColor: '#1f7a4d' },
         embeddedWallets: { solana: { createOnLogin: 'all-users' }, ethereum: { createOnLogin: 'off' } },
         solana: { rpcs: rpcs as never },
+        externalWallets: { solana: { connectors } },
       }}
     >
       <Bridge>{children}</Bridge>
@@ -132,15 +138,40 @@ function MobileOnly({ children }: { children: React.ReactNode }) {
 }
 
 function Bridge({ children }: { children: React.ReactNode }) {
-  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
+  const { ready, authenticated, user, logout, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const { signTransaction: privySign } = useSignTransaction();
   const mobile = useMobileSession();
+  const [selection, setSelection] = useState<WalletSelection | null>(null);
+  const [restoredUser, setRestoredUser] = useState<string | null>(null);
+  const [loginPending, setLoginPending] = useState(false);
+  const { login } = useLogin({
+    onComplete: ({ user: loggedIn, loginAccount, wasAlreadyAuthenticated }) => {
+      setLoginPending(false);
+      if (wasAlreadyAuthenticated) return;
+      const account = loginAccount?.type === 'wallet' && loginAccount.chainType === 'solana'
+        ? loginAccount : linkedSolanaWallet(loggedIn.linkedAccounts);
+      setSelection(account?.address ? { userId: loggedIn.id, address: account.address } : null);
+    },
+    onError: () => setLoginPending(false),
+  });
 
-  // The embedded wallet, not whatever else the user linked.
-  const wallet =
-    wallets.find((w) => (w as { standardWallet?: { name?: string } }).standardWallet?.name === 'Privy') ?? wallets[0];
-  const privyAddress = authenticated ? (wallet?.address ?? null) : null;
+  useEffect(() => {
+    if (!user?.id) { setSelection(null); setRestoredUser(null); return; }
+    let saved: WalletSelection | null = null;
+    try { saved = restoredWalletSelection(sessionStorage.getItem(WALLET_SELECTION_KEY), user.id); } catch { /* storage blocked */ }
+    setSelection(current => current?.userId === user.id ? current : saved);
+    setRestoredUser(user.id);
+  }, [user?.id]);
+  useEffect(() => {
+    if (!selection || selection.userId !== user?.id) return;
+    try { sessionStorage.setItem(WALLET_SELECTION_KEY, JSON.stringify(selection)); } catch { /* storage blocked */ }
+  }, [selection, user?.id]);
+
+  const selected = selection?.userId === user?.id ? selection?.address : null;
+  const account = linkedSolanaWallet(user?.linkedAccounts ?? [], selected);
+  const wallet = selectedSolanaWallet(wallets, user?.linkedAccounts ?? [], selected);
+  const privyAddress = authenticated && restoredUser === user?.id ? (account?.address ?? null) : null;
   // The phone account wins until the shopper starts Privy, which clears it.
   const address = mobile.mobileAddress ?? privyAddress;
 
@@ -150,7 +181,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
         const { signMobileTransaction } = await import('../lib/mobile-wallet-client.ts');
         return signMobileTransaction(tx);
       }
-      if (!wallet) throw new Error('No hay billetera conectada.');
+      if (!wallet) throw new Error('Volvé a conectar la billetera con la que iniciaste sesión.');
       const { signedTransaction } = await privySign({ transaction: tx, wallet, chain: 'solana:devnet' });
       return signedTransaction;
     },
@@ -160,7 +191,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
   const value = useMemo<WalletState>(
     () => ({
       enabled: true,
-      ready: ready && (!authenticated || walletsReady),
+      ready: ready && !loginPending && (!authenticated || (walletsReady && restoredUser === user?.id)),
       authenticated: Boolean(address),
       kind: mobile.mobileAddress ? 'mobile' : address ? 'privy' : 'off',
       address,
@@ -168,6 +199,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
       email: mobile.mobileAddress ? null : (user?.email?.address ?? user?.google?.email ?? null),
       login: () => {
         mobile.clearMobile();
+        setLoginPending(true);
         // Read the user agent at the click. The provider config above catches
         // up in an effect, and this override is what the modal actually shows.
         login({ loginMethods: privyLoginMethods(currentUserAgent()) });
@@ -175,6 +207,9 @@ function Bridge({ children }: { children: React.ReactNode }) {
       loginMobile: mobile.loginMobile,
       logout: async () => {
         mobile.clearMobile();
+        setLoginPending(false);
+        setSelection(null);
+        try { sessionStorage.removeItem(WALLET_SELECTION_KEY); } catch { /* storage blocked */ }
         try {
           await logout();
         } catch {
@@ -197,6 +232,9 @@ function Bridge({ children }: { children: React.ReactNode }) {
       logout,
       getAccessToken,
       signTransaction,
+      restoredUser,
+      loginPending,
+      user?.id,
     ],
   );
 
@@ -204,12 +242,10 @@ function Bridge({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * First paint offers email and Google. After mount the same list comes
- * back for browsers and for the Seeker WebShell, so the modal does not
- * drop Google.
+ * Email, Google and external wallets are offered in browsers and the Seeker WebShell.
  */
 function useShellLoginMethods(): PrivyLoginMethod[] {
-  const [methods, setMethods] = useState<PrivyLoginMethod[]>(['email', 'google']);
+  const [methods, setMethods] = useState<PrivyLoginMethod[]>([...DEFAULT_PRIVY_LOGIN_METHODS]);
   useEffect(() => {
     const next = privyLoginMethods(currentUserAgent());
     setMethods((prev) => (prev.length === next.length && prev.every((method, i) => method === next[i]) ? prev : next));

@@ -11,9 +11,10 @@
  *
  * `isEmbeddedAndroidWebView` still recognises the shell. It is not an auth
  * check, and it no longer removes a login method.
+ * External wallets remain available in every environment.
  */
 
-export const DEFAULT_PRIVY_LOGIN_METHODS = ['email', 'google'] as const;
+export const DEFAULT_PRIVY_LOGIN_METHODS = ['email', 'google', 'wallet'] as const;
 
 export type PrivyLoginMethod = (typeof DEFAULT_PRIVY_LOGIN_METHODS)[number];
 
@@ -37,7 +38,7 @@ export function privyLoginMethods(userAgent: string | null | undefined): PrivyLo
   // The shell marker and a raw Android WebView both get Google now. The
   // parameter stays so login() can keep reading the agent at the click.
   void userAgent;
-  return ['email', 'google'];
+  return [...DEFAULT_PRIVY_LOGIN_METHODS];
 }
 
 /** Empty outside the browser. Node's `navigator.userAgent` is not a WebView. */

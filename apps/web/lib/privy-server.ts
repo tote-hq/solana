@@ -1,8 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 /**
- * Server-side Privy: verify an access token and find the user's embedded
- * Solana wallet.
+ * Server-side Privy: verify an access token and select a linked Solana wallet.
  *
  * Not @privy-io/node: it pins @solana/kit 5 against the 8 the rest of the app
  * uses. An access token is an ES256 JWT signed by the app's JWKS, and a user's
@@ -28,6 +27,7 @@ export interface PrivyIdentity {
 export async function verifyPrivyToken(
   token: string,
   env: NodeJS.ProcessEnv = process.env,
+  selectedAddress?: string,
 ): Promise<PrivyIdentity | null> {
   const appId = env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
   const secret = env.PRIVY_APP_SECRET ?? '';
@@ -56,8 +56,10 @@ export async function verifyPrivyToken(
   } | null;
   const accounts = user?.linked_accounts ?? [];
   const wallet =
-    accounts.find((a) => a.type === 'wallet' && a.chain_type === 'solana' && a.wallet_client_type === 'privy') ??
-    accounts.find((a) => a.type === 'wallet' && a.chain_type === 'solana');
+    selectedAddress
+      ? accounts.find(a => a.type === 'wallet' && a.chain_type === 'solana' && a.address === selectedAddress)
+      : accounts.find((a) => a.type === 'wallet' && a.chain_type === 'solana' && a.wallet_client_type === 'privy') ??
+        accounts.find((a) => a.type === 'wallet' && a.chain_type === 'solana');
   const email = accounts.find((a) => a.type === 'email')?.address ?? null;
   return { userId, address: wallet?.address ?? null, email };
 }
@@ -83,7 +85,7 @@ export async function deletePrivyUser(
   const secret = env.PRIVY_APP_SECRET ?? '';
   if (!appId || !secret) return 'skipped';
 
-  const who = await verifyPrivyToken(token, env);
+  const who = await verifyPrivyToken(token, env, expectedAddress);
   if (!who?.userId || who.address !== expectedAddress) return 'failed';
 
   const res = await fetch(`${AUTH}/api/v1/users/${encodeURIComponent(who.userId)}`, {

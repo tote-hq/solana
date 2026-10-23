@@ -30,6 +30,8 @@ export const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
 /** Privy: the auth API, its embedded-wallet iframe, and its RPC relays. */
 const PRIVY = ['https://auth.privy.io', 'https://*.privy.io', 'https://*.privy.systems'];
 const PRIVY_WS = ['wss://*.privy.io', 'wss://relay.walletconnect.com'];
+/** Privy's external-wallet catalog and its wallet icons. */
+const WALLET_CATALOG = 'https://explorer-api.walletconnect.com';
 /**
  * Derived from lib/deployments.ts rather than listed, so the RPC the app is
  * pointed at and the RPC the browser may reach cannot drift. The wss twin is
@@ -91,12 +93,12 @@ export function appContentSecurityPolicy(
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? '' : " 'unsafe-eval'"}${join(vendors.script)} ${TURNSTILE_ORIGIN}`,
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: ${PRODUCT_IMAGES}${join(vendors.img)}`,
+    `img-src 'self' data: blob: ${PRODUCT_IMAGES} ${WALLET_CATALOG}${join(vendors.img)}`,
     "font-src 'self' data:",
     // Mobile Wallet Adapter associates on an ephemeral localhost port
     // (49152–65535, path /solana-wallet). CSP3 `*` here is a port wildcard.
     // The same probe fetches http://localhost and is caught if it fails.
-    `connect-src 'self' http://localhost http://127.0.0.1 ws://localhost:* ws://127.0.0.1:*${isProd ? '' : ' ws: wss:'} ${PRIVY.join(' ')} ${PRIVY_WS.join(' ')} ${SOLANA.join(' ')}${join(vendors.connect)} ${TURNSTILE_ORIGIN}`,
+    `connect-src 'self' http://localhost http://127.0.0.1 ws://localhost:* ws://127.0.0.1:*${isProd ? '' : ' ws: wss:'} ${PRIVY.join(' ')} ${PRIVY_WS.join(' ')} ${WALLET_CATALOG} ${SOLANA.join(' ')}${join(vendors.connect)} ${TURNSTILE_ORIGIN}`,
     // Turnstile's challenge, and the supermarket checkout the shopper
     // finishes the order on. 'self' is the dev fixture at /dev/checkout,
     // which stands in for a store that has no sandbox. This is the frames

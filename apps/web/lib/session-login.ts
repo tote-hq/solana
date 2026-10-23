@@ -1,3 +1,5 @@
+import { WALLET_HEADER } from './wallet-header.ts';
+
 /** Returns the Privy access token for the live session, or null. */
 export type TokenSource = () => Promise<string | null>;
 
@@ -5,7 +7,8 @@ export type TokenSource = () => Promise<string | null>;
  * Mint the httpOnly `chg_user` cookie that lifts the guest turn limit.
  *
  * The server does not take the address on trust: each mint carries the
- * Privy access token, and the server reads the wallet from Privy itself.
+ * Privy access token, and the server verifies the selected wallet belongs to
+ * that user's linked Solana accounts in Privy.
  *
  * Two callers race the same Privy login: the balance widget, which wants
  * the cookie to exist, and the chat, which has to *know* it exists before it
@@ -33,7 +36,7 @@ function start(address: string, sign: TokenSource): Promise<boolean> {
       token
         ? fetch('/api/session/login', {
             method: 'POST',
-            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            headers: { 'content-type': 'application/json', accept: 'application/json', [WALLET_HEADER]: address },
             credentials: 'same-origin',
             body: JSON.stringify({ token }),
           }).then((r) => r.ok && gen === generation)

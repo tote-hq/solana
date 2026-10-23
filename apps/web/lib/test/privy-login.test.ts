@@ -34,37 +34,37 @@ describe('privy login methods inside a WebView', () => {
   it('keeps email and Google in ordinary browsers', () => {
     for (const ua of ['', DESKTOP_CHROME, ANDROID_CHROME, IOS_SAFARI, 'Node.js/22']) {
       assert.equal(isEmbeddedAndroidWebView(ua), false, ua);
-      assert.deepEqual(privyLoginMethods(ua), ['email', 'google']);
+      assert.deepEqual(privyLoginMethods(ua), ['email', 'google', 'wallet']);
     }
-    assert.deepEqual(privyLoginMethods(null), ['email', 'google']);
-    assert.deepEqual(privyLoginMethods(undefined), ['email', 'google']);
+    assert.deepEqual(privyLoginMethods(null), ['email', 'google', 'wallet']);
+    assert.deepEqual(privyLoginMethods(undefined), ['email', 'google', 'wallet']);
   });
 
   it('keeps Google inside the Seeker WebShell and any Android WebView', () => {
     for (const ua of [SEEKER_WEB_SHELL, SEEKER_REDUCED, ANDROID_WEBVIEW, `Foo ${SOLANA_MOBILE_WEB_SHELL_MARKER}`]) {
       assert.equal(isEmbeddedAndroidWebView(ua), true, ua);
-      assert.deepEqual(privyLoginMethods(ua), ['email', 'google']);
+      assert.deepEqual(privyLoginMethods(ua), ['email', 'google', 'wallet']);
     }
   });
 
   it('does not treat a stray "wv" on a desktop browser as a WebView', () => {
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36 wv';
     assert.equal(isEmbeddedAndroidWebView(ua), false);
-    assert.deepEqual(privyLoginMethods(ua), ['email', 'google']);
+    assert.deepEqual(privyLoginMethods(ua), ['email', 'google', 'wallet']);
   });
 
   it('returns a fresh list so a caller cannot edit the default', () => {
     const methods = privyLoginMethods(DESKTOP_CHROME);
     methods.pop();
-    assert.deepEqual([...DEFAULT_PRIVY_LOGIN_METHODS], ['email', 'google']);
-    assert.deepEqual(privyLoginMethods(DESKTOP_CHROME), ['email', 'google']);
+    assert.deepEqual([...DEFAULT_PRIVY_LOGIN_METHODS], ['email', 'google', 'wallet']);
+    assert.deepEqual(privyLoginMethods(DESKTOP_CHROME), ['email', 'google', 'wallet']);
   });
 
   it('reads the runtime user agent, which in Node is not a WebView', () => {
     const ua = currentUserAgent();
     assert.equal(typeof ua, 'string');
     assert.equal(isEmbeddedAndroidWebView(ua), false);
-    assert.deepEqual(privyLoginMethods(ua), ['email', 'google']);
+    assert.deepEqual(privyLoginMethods(ua), ['email', 'google', 'wallet']);
   });
 
   it('the wallet provider asks for those methods both in the client config and at login()', () => {

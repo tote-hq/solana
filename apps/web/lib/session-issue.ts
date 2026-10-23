@@ -3,13 +3,14 @@ import { mintUserToken, sessionSecret, userCookieHeader } from './login-gate.ts'
 import { signInHost, verifySignInProof } from './mobile-session.ts';
 import { verifyPrivyToken } from './privy-server.ts';
 import { isSolanaAddress } from './solana.ts';
+import { WALLET_HEADER } from './wallet-header.ts';
 
 /**
  * POST /api/session/login — issue `chg_user`.
  *
  * Two proofs, and neither is an address on its own:
  *   - `{ token }`: a Privy access token. The server verifies it against
- *     Privy's JWKS and reads the embedded Solana wallet from Privy.
+ *     Privy's JWKS and reads the selected linked Solana wallet from Privy.
  *   - `{ walletProof }`: a phone wallet (Mobile Wallet Adapter). The server
  *     wrote the message (lib/mobile-session.ts); the wallet signed those
  *     exact bytes; the signature is checked here before the cookie exists.
@@ -49,7 +50,12 @@ export async function issueUserSession(
     return Response.json({ error: 'session_proof_required', message: 'Iniciá sesión de nuevo.' }, { status: 401 });
   }
 
-  const who = await verifyPrivyToken(token, env);
+  const selectedAddress = req.headers.get(WALLET_HEADER)?.trim();
+  if (selectedAddress && !isSolanaAddress(selectedAddress)) {
+    return Response.json({ error: 'invalid_wallet' }, { status: 400 });
+  }
+  // The requested wallet is a selector, never proof: Privy must list it as linked.
+  const who = await verifyPrivyToken(token, env, selectedAddress || undefined);
   if (!who) {
     return Response.json(
       { error: 'session_proof_invalid', message: 'No pudimos confirmar tu sesión. Iniciá sesión de nuevo.' },
