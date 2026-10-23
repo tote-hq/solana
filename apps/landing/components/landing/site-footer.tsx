@@ -2,7 +2,8 @@ import { FounderTrust } from '@changuito/trust/ui';
 
 import { FOOTER, NAV, SOCIAL } from '../../lib/copy';
 import { BrandLockup } from './brand-lockup';
-import { InstagramIcon, LinkedInIcon } from './icons';
+import { InstagramIcon, LinkedInIcon, XIcon } from './icons';
+import { PoweredBy } from './powered-by';
 
 import styles from './landing.module.css';
 
@@ -12,6 +13,12 @@ import styles from './landing.module.css';
  * other routes. trust=false skips the founder line on pages that already
  * show it above the fold.
  */
+const SOCIAL_ICONS = {
+  instagram: InstagramIcon,
+  linkedin: LinkedInIcon,
+  x: XIcon,
+} as const;
+
 export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; trust?: boolean }) {
   return (
     <footer className={styles.footer} data-testid="landing-footer">
@@ -43,20 +50,18 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
           </nav>
           <ul className={styles.footerSocial} data-testid="landing-social">
             {SOCIAL.map((link) => {
-              // The X glyph sits before the label "X" and reads as a second link.
-              const textOnly = link.icon === 'x';
+              const Icon = SOCIAL_ICONS[link.icon];
               return (
                 <li key={link.href}>
                   <a
-                    className={textOnly ? `${styles.socialLink} ${styles.socialText}` : styles.socialLink}
+                    className={styles.socialLink}
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={link.ariaLabel}
                     data-testid={`landing-social-${link.icon}`}
                   >
-                    {link.icon === 'instagram' ? <InstagramIcon className={styles.socialIcon} /> : null}
-                    {link.icon === 'linkedin' ? <LinkedInIcon className={styles.socialIcon} /> : null}
+                    <Icon className={styles.socialIcon} />
                     <span>{link.label}</span>
                   </a>
                 </li>
@@ -65,6 +70,7 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
           </ul>
         </div>
       </div>
+      <PoweredBy />
       <p className={styles.fine}>{FOOTER.legal}</p>
       {trust ? <FounderTrust className={styles.fine} /> : null}
     </footer>

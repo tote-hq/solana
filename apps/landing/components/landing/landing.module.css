@@ -438,7 +438,25 @@
 
 .footer {
   border-top: 1px solid var(--line);
-  padding: 40px 24px 48px;
+  padding: 40px 24px calc(48px + env(safe-area-inset-bottom, 0px));
+  /* Light plate in both color schemes. The wordmark and the mono partner
+     marks are dark ink on transparency; a dark canvas drops #6B5A52 to
+     about 2.8:1. --ink on --paper is about 16:1, --ink-soft (#5c534c) is
+     7.2:1. */
+  color-scheme: light;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .footer {
+    background: #fafaf7;
+    color: #2a1a14;
+    --ink: #2a1a14;
+    --ink-soft: #5c534c;
+    --paper: #fafaf7;
+    --line: rgba(42, 26, 20, 0.14);
+  }
 }
 
 .footerInner {
@@ -490,8 +508,7 @@
   justify-content: flex-end;
 }
 
-/* 44×44 at least (WCAG 2.5.5). The X link is a single letter, so padding
-   alone left it about 32px wide; min-width is what makes the square. */
+/* 44×44 at least (WCAG 2.5.5). min-width is what makes a short label square. */
 .socialLink {
   display: inline-flex;
   align-items: center;
@@ -509,14 +526,77 @@
   color: var(--ink-soft);
 }
 
-/* Text-only social link: the word is the control, so it needs an underline. */
-.socialText {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .socialIcon {
   flex-shrink: 0;
+}
+
+/* Partner lockup. Logos are 16px tall, 18px from 768px. The link is the
+   44px target; the picture is not. Grey is baked into the mono assets
+   (#6B5A52, about 6.3:1 on --paper). Superteam stays in color. */
+.poweredBy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  max-width: 1120px;
+  margin: 28px auto 0;
+}
+
+.poweredByLabel {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.poweredByList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.poweredByLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.poweredByLink:hover {
+  background: rgba(42, 26, 20, 0.06);
+}
+
+.poweredByLogo {
+  display: block;
+  height: 16px;
+  width: auto;
+}
+
+.poweredByLogoColor {
+  border-radius: 4px;
+}
+
+@media (min-width: 768px) {
+  .poweredByList {
+    gap: 8px 16px;
+  }
+
+  .poweredByLogo {
+    height: 18px;
+  }
 }
 
 .fine {
