@@ -1,6 +1,7 @@
 import { FounderTrust } from '@changuito/trust/ui';
 
 import { FOOTER, NAV, SOCIAL } from '../../lib/copy';
+import { LEGAL_FOOTER_LINKS } from '../../lib/legal';
 import { BrandLockup } from './brand-lockup';
 import { InstagramIcon, LinkedInIcon, XIcon } from './icons';
 import { PoweredBy } from './powered-by';
@@ -41,6 +42,13 @@ export function SiteFooter({ navBase = '', trust = true }: { navBase?: string; t
                   Reportar un bug
                 </a>
               </li>
+              {LEGAL_FOOTER_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a className={styles.footerLink} href={link.href} data-testid={link.testId}>
+                    {link.label}
+                  </a>
+                </li>
+              ))}
               <li>
                 <a className={styles.footerLink} href="/">
                   {FOOTER.siteLabel}
