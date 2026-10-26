@@ -24,6 +24,8 @@ class ManualSessions:
     def __init__(self):
         self.store: ManualStore | None = None
         self.active: str | None = None
+        self.sandbox = None
+        self.page_lock = asyncio.Lock()
         self.controllers: dict[str, WebSocket] = {}
         self.callback_ready = False
 
@@ -75,27 +77,37 @@ class ManualSessions:
         sb.context.on('response', response)
         sb.allow_payment = True  # manual submission now explicitly authorized by the shopper's mode
         try:
+            self.sandbox = sb
             while True:
                 r = self.store.get(job_id)
                 if not r['sessionActive'] or time.time() * 1000 >= r['viewerExpiresAt']:
                     break
-                if 'orderPlaced' in page.url:
-                    # A redirect alone is not proof: confirm the group through the merchant API.
-                    from urllib.parse import parse_qs
-                    group = parse_qs(urlsplit(page.url).query).get('og', [''])[0]
-                    if group and len(group) <= 100:
-                        orders = await page.evaluate('''async group => {
-                          try {
-                            const orders = await window.vtexjs.checkout.getOrders(group);
-                            return orders.map(o => ({id:o.orderId, group:o.orderGroup}));
-                          } catch { return []; }
-                        }''', group)
-                        order = next((o for o in orders if o.get('group') == group and o.get('id')), None)
-                        if order:
-                            self.store.update(job_id, purchase='placed', store_order_id=order['id'])
-                            break
+                # Card entry uses the same page. Hold the lock so a fill and this
+                # poll do not drive Playwright at the same time.
+                async with self.page_lock:
+                    r = self.store.get(job_id)
+                    if not r['sessionActive'] or time.time() * 1000 >= r['viewerExpiresAt']:
+                        break
+                    if 'orderPlaced' in page.url:
+                        # A redirect alone is not proof: confirm the group through the merchant API.
+                        from urllib.parse import parse_qs
+                        group = parse_qs(urlsplit(page.url).query).get('og', [''])[0]
+                        if group and len(group) <= 100:
+                            orders = await page.evaluate('''async group => {
+                              try {
+                                const orders = await window.vtexjs.checkout.getOrders(group);
+                                return orders.map(o => ({id:o.orderId, group:o.orderGroup}));
+                              } catch { return []; }
+                            }''', group)
+                            order = next((o for o in orders if o.get('group') == group and o.get('id')), None)
+                            if order:
+                                self.store.update(job_id, purchase='placed', store_order_id=order['id'])
+                                break
                 await asyncio.sleep(1)
         finally:
+            async with self.page_lock:
+                if self.sandbox is sb:
+                    self.sandbox = None
             sb.allow_payment = False
             sb.context.remove_listener('request', request)
             sb.context.remove_listener('response', response)
@@ -108,6 +120,26 @@ class ManualSessions:
             self.store.update(job_id, status='done', sessionActive=False, purchase=purchase)
             await self.disconnect(job_id)
             self.active = None
+
+    async def apply_card(self, job_id: str, card: dict) -> dict:
+        """Type a shopper's card into the open merchant form. Values stay in the browser only."""
+        async with self.page_lock:
+            record = self.store.get(job_id) if self.store else None
+            if (self.active != job_id or self.sandbox is None or not record or not record['sessionActive']
+                    or record['viewerExpiresAt'] <= time.time() * 1000 or record['purchase'] != 'not_started'):
+                raise PermissionError('session unavailable')
+            from checkout import fill_card, normalize_card
+            normalized = normalize_card(card)
+            if not normalized:
+                raise ValueError('incomplete card')
+            try:
+                result = await fill_card(self.sandbox, normalized)
+            except Exception:
+                raise RuntimeError('card form unavailable') from None
+            record = self.store.get(job_id)
+            if not record or record['purchase'] != 'not_started':
+                raise PermissionError('session unavailable')
+            return {'filled': list(result.get('filled') or []), 'missing': list(result.get('missing') or [])}
 
     async def disconnect(self, job_id):
         if ws := self.controllers.pop(job_id, None):

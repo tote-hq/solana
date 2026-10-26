@@ -25,6 +25,8 @@ class ManualStore:
             record text not null, delivered integer not null default 0);
           create table if not exists tickets (
             hash text primary key, job_id text not null, expires real not null);
+          create table if not exists card_grants (
+            hash text primary key, job_id text not null, expires real not null);
         """)
 
     def get(self, job_id: str) -> dict | None:
@@ -89,6 +91,7 @@ class ManualStore:
                             purchase='unknown' if record['preparedAt'] else 'not_started')
         with self.db:
             self.db.execute('delete from tickets')
+            self.db.execute('delete from card_grants')
 
     def pending(self) -> list[dict]:
         return [r for (raw, delivered) in self.db.execute('select record,delivered from jobs')
@@ -114,6 +117,27 @@ class ManualStore:
         with self.db:
             row = self.db.execute('delete from tickets where hash=? and job_id=? and expires>? returning hash',
                                   (digest, job_id, time.time())).fetchone()
+        return bool(row)
+
+    def card_grant(self, job_id: str) -> str:
+        """Reusable until the session ends. Only the hash is stored."""
+        record = self.get(job_id)
+        if not record or not record['sessionActive'] or record['viewerExpiresAt'] <= time.time() * 1000:
+            raise ValueError('session unavailable')
+        token = secrets.token_urlsafe(32)
+        with self.db:
+            self.db.execute('delete from card_grants where job_id=? or expires<?', (job_id, time.time()))
+            self.db.execute('insert into card_grants values(?,?,?)',
+                            (hashlib.sha256(token.encode()).hexdigest(), job_id, record['viewerExpiresAt'] / 1000))
+        return token
+
+    def card_granted(self, token: str, job_id: str) -> bool:
+        record = self.get(job_id)
+        if not record or not record['sessionActive'] or record['viewerExpiresAt'] <= time.time() * 1000:
+            return False
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        row = self.db.execute('select 1 from card_grants where hash=? and job_id=? and expires>?',
+                              (digest, job_id, time.time())).fetchone()
         return bool(row)
 
     @staticmethod

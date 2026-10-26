@@ -114,6 +114,38 @@ class ManualLifecycleTests(unittest.TestCase):
     def test_database_is_private_to_the_worker(self):
         self.assertEqual(Path(self.path).stat().st_mode & 0o777, 0o600)
 
+    def test_card_grant_is_hashed_reusable_and_replaced(self):
+        self.ready()
+        token = self.store.card_grant(self.id)
+        raw = self.store.db.execute('select hash from card_grants').fetchone()[0]
+        self.assertNotEqual(raw, token)
+        self.assertEqual(raw, hashlib.sha256(token.encode()).hexdigest())
+        self.assertTrue(self.store.card_granted(token, self.id))
+        self.assertTrue(self.store.card_granted(token, self.id))
+        self.assertFalse(self.store.card_granted(token, 'b' * 32))
+        nxt = self.store.card_grant(self.id)
+        self.assertFalse(self.store.card_granted(token, self.id))
+        self.assertTrue(self.store.card_granted(nxt, self.id))
+        event = json.dumps(self.store.event(self.store.get(self.id)))
+        self.assertNotIn(token, event)
+        self.assertNotIn(nxt, event)
+
+    def test_card_grant_expires_with_the_session(self):
+        ready = self.ready()
+        token = self.store.card_grant(self.id)
+        with patch('manual_store.time.time', return_value=ready['viewerExpiresAt'] / 1000 + 1):
+            self.assertFalse(self.store.card_granted(token, self.id))
+            with self.assertRaises(ValueError):
+                self.store.card_grant(self.id)
+
+    def test_restart_drops_card_grants(self):
+        self.ready()
+        self.store.card_grant(self.id)
+        other = ManualStore(self.path)
+        other.recover()
+        self.assertEqual(other.db.execute('select count(*) from card_grants').fetchone()[0], 0)
+        other.db.close()
+
 
 class ManualCardBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_worker_shutdown_does_not_swallow_cancellation(self):
@@ -142,6 +174,20 @@ class ManualCardBoundaryTests(unittest.IsolatedAsyncioTestCase):
         from agent import run_job
         with self.assertRaises(ValueError):
             await run_job([], record=True, on_manual=lambda _: None)
+
+    async def test_card_apply_without_a_browser_is_refused(self):
+        from manual import ManualSessions
+        with tempfile.TemporaryDirectory() as directory:
+            store = ManualStore(str(Path(directory) / 'jobs.sqlite3'))
+            job, _ = store.create('d' * 64, 'fixture')
+            store.update(job['job_id'], status='running', preparation='preparing')
+            store.ready(job['job_id'])
+            sessions = ManualSessions()
+            sessions.store = store
+            sessions.active = job['job_id']
+            with self.assertRaises(PermissionError):
+                await sessions.apply_card(job['job_id'], {})
+            store.db.close()
 
 
 if __name__ == '__main__':
