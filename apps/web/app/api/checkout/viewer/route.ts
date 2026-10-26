@@ -17,8 +17,10 @@ export async function POST(req: Request): Promise<Response> {
     if (!response.ok) throw new Error('session unavailable');
     const result = await response.json();
     if (typeof result.ticket !== 'string' || !/^[A-Za-z0-9_-]{40,64}$/.test(result.ticket)) throw new Error('invalid ticket');
+    const cardToken = typeof result.cardToken === 'string' && /^[A-Za-z0-9_-]{40,64}$/.test(result.cardToken)
+      ? result.cardToken : '';
     const viewerUrl = new URL('/viewer/', process.env.SANDBOX_URL).toString();
-    return Response.json({ viewerUrl, jobId: rec.jobId, ticket: result.ticket, expiresAt: rec.manual.viewerExpiresAt },
+    return Response.json({ viewerUrl, jobId: rec.jobId, ticket: result.ticket, cardToken, expiresAt: rec.manual.viewerExpiresAt },
       { headers: { 'cache-control': 'no-store' } });
   } catch { return Response.json({ error: 'No pudimos conectar el navegador.' }, { status: 503 }); }
 }

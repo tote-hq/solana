@@ -69,6 +69,13 @@ expiry, then returns a scoped, single-use ticket lasting 60 seconds. The parent
 passes it using origin/source-checked `postMessage`; the socket uses a subprotocol
 rather than putting a ticket in a URL. Reconnecting replaces the active controller.
 
+The same response carries a card grant, valid until the session ends and stored
+only as a hash. The viewer form posts the shopper's card to the worker, which
+types it into the merchant form. The card is not written to the job database,
+the event outbox, or the app. Submitting the form again replaces the card until
+the merchant payment request has started; after that the form is refused. The
+remote keyboard remains for verification challenges.
+
 `POST /api/checkout/cancel` asks the worker to atomically decide whether the fee
 was earned. Cancellation tombstones prevent a delayed start creating another
 job. Closing a viewer does not cancel a merchant order already submitted.

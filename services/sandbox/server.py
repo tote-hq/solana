@@ -15,7 +15,9 @@ the card to pay with ({pan, cvv, exp_month, exp_year, holder, kind}), from the
 web app's `shared_card` row; without it the run stops at the payment step.
 Both live on the in-memory job until the run ends and are then deleted;
 `GET /jobs/{id}` never returns them and nothing logs them. Nothing here reads a
-login or a card from the environment.
+login or a card from the environment. A manual session does not take a card on
+the job: the shopper submits one later to the viewer, and that value is typed
+into the merchant form and then discarded.
 
 One job at a time, on purpose: one browser, one card, and a cart tied to a
 session. Jobs live in memory. A restart loses them, and the app reads a 404
@@ -32,7 +34,7 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
 from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 import json
@@ -260,7 +262,7 @@ async def ticket(job_id: str):
     if not sessions.store or sessions.active != job_id:
         raise HTTPException(409, 'session unavailable')
     try:
-        return {'ticket': sessions.store.ticket(job_id)}
+        return {'ticket': sessions.store.ticket(job_id), 'cardToken': sessions.store.card_grant(job_id)}
     except ValueError:
         raise HTTPException(409, 'session unavailable') from None
 
@@ -292,6 +294,35 @@ async def cancel_order(order_id: str, body: CancelOrder):
 @app.websocket('/viewer/{job_id}/socket')
 async def viewer_socket(ws: WebSocket, job_id: str):
     await sessions.relay(ws, job_id)
+
+
+@app.post('/viewer/{job_id}/card')
+async def viewer_card(job_id: str, request: Request):
+    """Shopper's browser only. The body is a card and is never logged or stored."""
+    public = os.environ.get('SANDBOX_PUBLIC_URL', '').rstrip('/')
+    if not public or request.headers.get('origin') != public:
+        raise HTTPException(403, 'origin')
+    if not re.fullmatch(r'[0-9a-f]{32}', job_id):
+        raise HTTPException(404, 'unknown job')
+    raw = await request.body()
+    if len(raw) > 2048:
+        raise HTTPException(413, 'too large')
+    header = request.headers.get('authorization', '')
+    token = header[7:] if header.startswith('Bearer ') else ''
+    if not sessions.store or not token or not sessions.store.card_granted(token, job_id):
+        raise HTTPException(401, 'unauthorized')
+    try:
+        card = Card.model_validate_json(raw)
+    except Exception:
+        raise HTTPException(422, 'invalid card') from None
+    try:
+        return await sessions.apply_card(job_id, card.model_dump())
+    except PermissionError:
+        raise HTTPException(409, 'session unavailable') from None
+    except ValueError:
+        raise HTTPException(422, 'invalid card') from None
+    except Exception:
+        raise HTTPException(502, 'card form unavailable') from None
 
 
 @app.get('/viewer/')

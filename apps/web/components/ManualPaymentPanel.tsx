@@ -13,7 +13,7 @@ export function ManualPaymentPanel({ orderId, status, onUpdate }: {
   const en = lang === 'en';
   const wallet = useWallet();
   const frame = useRef<HTMLIFrameElement>(null);
-  const pending = useRef<{ jobId: string; ticket: string } | null>(null);
+  const pending = useRef<{ jobId: string; ticket: string; cardToken: string; lang: 'en' | 'es' } | null>(null);
   const viewerOrigin = useRef('');
   const loaded = useRef(false);
   const connecting = useRef(false);
@@ -54,7 +54,9 @@ export function ManualPaymentPanel({ orderId, status, onUpdate }: {
       const result = await request('viewer');
       const url = new URL(result.viewerUrl);
       viewerOrigin.current = url.origin;
-      pending.current = { jobId: result.jobId, ticket: result.ticket };
+      pending.current = {
+        jobId: result.jobId, ticket: result.ticket, cardToken: result.cardToken ?? '', lang: en ? 'en' : 'es',
+      };
       if (loaded.current && frame.current) {
         frame.current.contentWindow?.postMessage({ type: 'changuito-viewer-connect', ...pending.current }, url.origin);
         pending.current = null;
@@ -97,8 +99,8 @@ export function ManualPaymentPanel({ orderId, status, onUpdate }: {
     {status?.storeOrderId ? <p>{en ? 'DIA order' : 'Pedido DIA'}: {status.storeOrderId}</p> : null}
     {active ? <>
       <p aria-live="off">{en ? 'Session remaining' : 'Tiempo restante'}: {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</p>
-      <p className="ck-note">{en ? 'Enter your own card details and complete any verification inside DIA. Review its final amount before paying.'
-        : 'Ingresá tu tarjeta y completá las verificaciones dentro de DIA. Revisá el importe final antes de pagar.'}</p>
+      <p className="ck-note">{en ? 'Enter your card in the form. Then review the amount and complete any verification in the DIA session.'
+        : 'Ingresá tu tarjeta en el formulario. Después revisá el importe y completá la verificación en la sesión de Día.'}</p>
       <button type="button" className="btn" onClick={() => void connect()}>{en ? 'Open / reconnect browser' : 'Abrir / reconectar navegador'}</button>
       {src ? <iframe ref={frame} src={src} title={en ? 'Your prepared DIA payment session' : 'Tu sesión de pago preparada en DIA'}
         style={{ width: '100%', height: 'min(70dvh, 760px)', minHeight: 380, border: '1px solid var(--border, #64748b)' }}
