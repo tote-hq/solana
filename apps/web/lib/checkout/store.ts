@@ -19,6 +19,8 @@ export interface CheckoutRecord {
   checkoutKind?: 'manual_fee_v1';
   orderNonce?: string;
   manual?: ManualState;
+  /** Chosen at start and kept for this order. A later config flip does not move it. */
+  manualFlow?: 'viewer' | 'guided' | 'headless';
   /** Hex of the 32-byte order id. */
   orderId: string;
   buyer: string;

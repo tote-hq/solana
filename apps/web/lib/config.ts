@@ -4,7 +4,9 @@
  *
  * The table is the only source. A missing row, a missing table or no
  * DATABASE_URL all read as "off", the conservative direction for every flag
- * here. Reads are cached for 15 seconds per instance, so a flip takes effect
+ * here. `manual_checkout_flow` is the exception: anything other than
+ * `guided` or `headless` reads as `viewer`, which is today's remote browser.
+ * Reads are cached for 15 seconds per instance, so a flip takes effect
  * within that on every lambda.
  */
 import { db, hasDatabase } from './db.ts';
@@ -33,6 +35,19 @@ export async function getConfig(now = Date.now()): Promise<Record<string, unknow
 export function flagOn(values: Record<string, unknown>, key: string): boolean {
   const v = values[key];
   return v === true || v === 'true';
+}
+
+/** Presentation of manual checkout. Unknown, missing and a down database are `viewer`. */
+export type ManualCheckoutFlow = 'viewer' | 'guided' | 'headless';
+
+export function manualCheckoutFlow(values: Record<string, unknown>): ManualCheckoutFlow {
+  const value = values.manual_checkout_flow;
+  return value === 'guided' || value === 'headless' ? value : 'viewer';
+}
+
+/** Attached to a quote only for a wallet already admitted to manual checkout. */
+export function memberFlow(admitted: boolean, values: Record<string, unknown>): ManualCheckoutFlow | undefined {
+  return admitted ? manualCheckoutFlow(values) : undefined;
 }
 
 export interface SandboxFlags {

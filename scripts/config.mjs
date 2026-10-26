@@ -5,6 +5,7 @@
  *   npm run config -- get sandbox_mock
  *   npm run config -- set sandbox_mock true
  *   npm run config -- set sandbox_mock_fail false
+ *   npm run config -- set manual_checkout_flow guided
  *
  * Connects like scripts/db.mjs: the web app's env file loaded the way Next
  * does, DIRECT_URL or DATABASE_URL, and never prints either. The app caches
@@ -34,6 +35,15 @@ const KNOWN = {
     on ? "the mock's card comes back declined (the refund path)" : 'the mock places the order (the settle path)',
 };
 
+/** String keys. Anything other than the listed values reads as the default. */
+const STRING_KEYS = {
+  manual_checkout_flow: (value) => {
+    if (value === 'guided') return 'members see one checkout step at a time, then the remote browser';
+    if (value === 'headless') return 'members see progress and a card form; the worker pays with no remote browser';
+    return 'members see the remote browser checkout (also the reading when the value is missing or unknown)';
+  },
+};
+
 /** Never the URL itself — only enough of it to tell one database from another. */
 function where(url) {
   try {
@@ -60,7 +70,11 @@ const parse = (raw) => {
     return raw;
   }
 };
-const describe = (key, value) => (KNOWN[key] ? `  → ${KNOWN[key](value === true || value === 'true')}` : '');
+const describe = (key, value) => {
+  if (STRING_KEYS[key]) return `  → ${STRING_KEYS[key](value)}`;
+  return KNOWN[key] ? `  → ${KNOWN[key](value === true || value === 'true')}` : '';
+};
+const known = (key) => Boolean(KNOWN[key] || STRING_KEYS[key]);
 
 const [cmd = 'list', key, raw] = process.argv.slice(2);
 try {
@@ -72,10 +86,16 @@ try {
     }
   } else if (cmd === 'get' && key) {
     const [r] = await sql`select value from config where key = ${key}`;
-    console.log(r ? `${key} = ${JSON.stringify(r.value)}${describe(key, r.value)}` : `${key} is not set (reads as off)`);
+    const missing = key === 'manual_checkout_flow' ? 'reads as viewer' : 'reads as off';
+    console.log(r ? `${key} = ${JSON.stringify(r.value)}${describe(key, r.value)}` : `${key} is not set (${missing})`);
   } else if (cmd === 'set' && key && raw !== undefined) {
-    if (!KNOWN[key]) console.warn(`note: ${key} is not a key the app reads (known: ${Object.keys(KNOWN).join(', ')})`);
+    if (!known(key)) console.warn(`note: ${key} is not a key the app reads (known: ${[...Object.keys(KNOWN), ...Object.keys(STRING_KEYS)].join(', ')})`);
     const value = parse(raw);
+    if (key === 'manual_checkout_flow' && !['viewer', 'guided', 'headless'].includes(value)) {
+      console.error('manual_checkout_flow must be viewer, guided or headless');
+      process.exitCode = 2;
+      return;
+    }
     await sql`insert into config (key, value) values (${key}, ${sql.json(value)})
               on conflict (key) do update set value = excluded.value`;
     console.log(`${key} = ${JSON.stringify(value)} on ${where(url)}${describe(key, value)}`);

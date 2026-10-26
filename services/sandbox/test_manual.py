@@ -190,5 +190,21 @@ class ManualCardBoundaryTests(unittest.IsolatedAsyncioTestCase):
             store.db.close()
 
 
+class UnattendedPaymentTests(unittest.TestCase):
+    def test_only_a_complete_headless_card_pays_and_a_challenge_does_not_place(self):
+        from manual import ManualSessions, blocks_unattended_purchase, should_pay_unattended
+        sessions = ManualSessions()
+        sessions.note_flow('job', 'nope')
+        self.assertEqual(sessions.flows['job'], 'viewer')
+        sessions.note_flow('job', 'headless')
+        self.assertFalse(should_pay_unattended('viewer', []))
+        self.assertFalse(should_pay_unattended('guided', []))
+        self.assertFalse(should_pay_unattended('headless', ['pan']))
+        self.assertTrue(should_pay_unattended(sessions.flows['job'], []))
+        self.assertTrue(blocks_unattended_purchase(True, False))
+        self.assertTrue(blocks_unattended_purchase(False, True))
+        self.assertFalse(blocks_unattended_purchase(False, False))
+
+
 if __name__ == '__main__':
     unittest.main()

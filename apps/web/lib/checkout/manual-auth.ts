@@ -17,5 +17,6 @@ export async function ownedManual(req: Request) {
   if (!rec || rec.buyer !== user.address || rec.checkoutKind !== 'manual_fee_v1') {
     return { ok: false, response: Response.json({ error: 'Pedido no encontrado.' }, { status: 404 }) } as const;
   }
-  return { ok: true, rec } as const;
+  const part = body.part === 'form' || body.part === 'screen' ? body.part : 'all';
+  return { ok: true, rec, part } as const;
 }

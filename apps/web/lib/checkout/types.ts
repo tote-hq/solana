@@ -5,6 +5,8 @@ export interface QuoteResponse {
   orderNonce?: string;
   feeReleaseBasis?: 'checkout_prepared';
   viewerDurationSecs?: number;
+  /** Present only when this quote is a manual checkout for a card member. */
+  manualFlow?: 'viewer' | 'guided' | 'headless';
   resumeStatus?: StatusResponse;
   orderId: string;
   /** USDC base units (6 decimals), decimal string. */
@@ -40,6 +42,8 @@ export type CheckoutStage = 'quoted' | 'locked' | 'shopping' | 'done' | 'refunde
 export interface StatusResponse {
   checkoutKind?: 'manual_fee_v1';
   manual?: import('./manual-policy.ts').ManualState;
+  /** The flow stored on the order at start. Absent on older records, which stay on the remote browser. */
+  manualFlow?: 'viewer' | 'guided' | 'headless';
   feeStatus?: 'escrowed' | 'settlement_pending' | 'settled' | 'refund_pending' | 'refunded';
   orderId: string;
   stage: CheckoutStage;

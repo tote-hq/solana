@@ -33,11 +33,18 @@ header button:focus-visible,header input:focus-visible{outline:2px solid #f4b942
 #apply-card:disabled{opacity:.45;cursor:not-allowed}
 #card-status:empty{display:none}
 #card-status.ok{color:#1a7f4b}
+html[data-part=form] header, html[data-part=form] #screen { display: none }
+html[data-part=form], html[data-part=form] body { height: auto; background: #fafaf7; color: #2a1a14 }
+html[data-part=screen] #card-form { display: none }
 @media(max-width:520px){
   .expiry{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .expiry label:last-child{grid-column:1 / -1}
 }
 </style>
+<script>
+  var viewerPart = new URLSearchParams(location.search).get('part');
+  if (viewerPart === 'form' || viewerPart === 'screen') document.documentElement.dataset.part = viewerPart;
+</script>
 <header>
   <span id="status" role="status">Conectando / Connecting…</span>
   <button id="reconnect" type="button">Reconectar / Reconnect</button>
@@ -78,7 +85,7 @@ header button:focus-visible,header input:focus-visible{outline:2px solid #f4b942
       <span id="cvv-error" class="err" hidden></span>
     </label>
   </div>
-  <p id="card-status" role="status"></p>
+  <p id="card-status" role="status" tabindex="-1"></p>
   <button id="apply-card" type="button">Cargar en Día</button>
 </form>
 <div id="screen" aria-label="DIA checkout / Pago en DIA"></div>
