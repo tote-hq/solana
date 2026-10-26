@@ -94,5 +94,6 @@ export function manualStatus(rec: CheckoutRecord): StatusResponse {
     phase: rec.phase ?? 'queued', payment: m.purchase === 'placed' ? 'placed' : m.purchase === 'declined' ? 'declined' : null,
     storeOrderId: rec.storeOrderId ?? null, openSig: rec.openSig ?? null, closeSig: rec.closeSig ?? null,
     handoffUrl: null, amountDisplay: '0.10', error: null, mode: 'live', alert: rec.closeFailures ? 'resolver_failed' : null,
+    ...(rec.manualFlow ? { manualFlow: rec.manualFlow } : {}),
   };
 }

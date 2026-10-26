@@ -20,6 +20,16 @@ def parent_origins() -> list[str]:
             and urlsplit(s.strip()).path in ('', '/')]
 
 
+def should_pay_unattended(flow: str, missing: list) -> bool:
+    """Headless pays only after every card field landed. Guided waits for the shopper."""
+    return flow == 'headless' and not missing
+
+
+def blocks_unattended_purchase(challenge: bool, refused: bool) -> bool:
+    """An image challenge or CHK0082 must not be recorded as a placed order."""
+    return challenge or refused
+
+
 class ManualSessions:
     def __init__(self):
         self.store: ManualStore | None = None
@@ -28,12 +38,17 @@ class ManualSessions:
         self.page_lock = asyncio.Lock()
         self.controllers: dict[str, WebSocket] = {}
         self.callback_ready = False
+        self.flows: dict[str, str] = {}
+        self.tasks: set[asyncio.Task] = set()
 
     def start(self):
         data = os.environ.get('SANDBOX_DATA_DIR')
         if data:
             self.store = ManualStore(str(Path(data) / 'manual.sqlite3'))
             self.store.recover()
+
+    def note_flow(self, job_id: str, flow: str | None) -> None:
+        self.flows[job_id] = flow if flow in ('guided', 'headless') else 'viewer'
 
     async def available(self) -> bool:
         if (not self.store or not self.callback_ready or not parent_origins() or not os.environ.get('SANDBOX_CALLBACK_URL')
@@ -68,7 +83,7 @@ class ManualSessions:
             if '/api/checkout/pub/orderForm/' in path and path.endswith('/transaction'):
                 if not self.store.get(job_id)['sessionActive']:
                     return
-                if resp.status == 403:
+                if resp.status == 403 and blocks_unattended_purchase(False, True):
                     self.store.update(job_id, purchase='verification_required')
                 elif 200 <= resp.status < 300:
                     self.store.update(job_id, purchase='in_progress')
@@ -139,7 +154,39 @@ class ManualSessions:
             record = self.store.get(job_id)
             if not record or record['purchase'] != 'not_started':
                 raise PermissionError('session unavailable')
-            return {'filled': list(result.get('filled') or []), 'missing': list(result.get('missing') or [])}
+            filled = list(result.get('filled') or [])
+            missing = list(result.get('missing') or [])
+            schedule = should_pay_unattended(self.flows.get(job_id, 'viewer'), missing)
+        if schedule:
+            task = asyncio.create_task(self.pay_unattended(job_id))
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
+        return {'filled': filled, 'missing': missing}
+
+    async def pay_unattended(self, job_id: str) -> None:
+        """Press the store's own pay button on the headed Xvfb browser.
+
+        Hiding the viewer is the product change. A real headless Chrome is what
+        already came back with CHK0082 and no captcha frame, so this stays headed.
+        An image challenge or a refused transaction is not a placed order.
+        """
+        try:
+            async with self.page_lock:
+                record = self.store.get(job_id) if self.store else None
+                if (self.active != job_id or self.sandbox is None or not record
+                        or record['purchase'] != 'not_started'):
+                    return
+                from checkout import complete_store_recaptcha, press_store_pay
+                outcome = await complete_store_recaptcha(self.sandbox.main)
+                if blocks_unattended_purchase(outcome == 'challenge', False):
+                    self.store.update(job_id, purchase='verification_required')
+                    return
+                if not await press_store_pay(self.sandbox):
+                    self.store.update(job_id, purchase='verification_required')
+        except Exception:
+            record = self.store.get(job_id) if self.store else None
+            if record and record['purchase'] == 'not_started':
+                self.store.update(job_id, purchase='verification_required')
 
     async def disconnect(self, job_id):
         if ws := self.controllers.pop(job_id, None):

@@ -19,7 +19,7 @@ import type { Cart } from '@changuito/mcp/types';
 import { quoteRate } from '../../../../lib/checkout/rate.ts';
 import { NO_DELIVERY, quoteShipping, type ShippingLocation } from '../../../../lib/checkout/shipping.ts';
 import { checkoutStore } from '../../../../lib/checkout/store.ts';
-import { sandboxFlags, getConfig, flagOn } from '../../../../lib/config.ts';
+import { sandboxFlags, getConfig, flagOn, memberFlow } from '../../../../lib/config.ts';
 import { manualAvailable, manualStatus } from '../../../../lib/checkout/manual-server.ts';
 import { MANUAL_KIND, SERVICE_FEE_CENTS, serviceOrderId, VIEWER_SECONDS } from '../../../../lib/checkout/manual-policy.ts';
 import { hasDatabase, db } from '../../../../lib/db.ts';
@@ -82,6 +82,7 @@ export async function POST(req: Request): Promise<Response> {
         totalCentavos: cart.total.centavos + (rec.shippingCentavos ?? 0), postalCode: rec.postalCode,
         postalSource: 'profile', chatPostalCode: null, programId: DEPLOYMENTS.devnet.programId,
         usdcMint: DEPLOYMENTS.devnet.usdcMint, mode: 'live', resumeStatus: manualStatus(rec),
+        ...(rec.manualFlow ? { manualFlow: rec.manualFlow } : {}),
       }, { headers: { 'cache-control': 'no-store' } });
     } catch (err) { if ((err as { code?: string }).code !== '42P01') throw err; }
   }
@@ -90,9 +91,11 @@ export async function POST(req: Request): Promise<Response> {
   // Everyone else gets the demo run: same lock, the mock stops at payment,
   // refund, and the cart link to finish in Día. Asked here so the modal can
   // say which run this is before anything is locked; the start asks again.
+  const config = await getConfig();
   const access = await cardAccess(user.address, (await sandboxFlags()).mock);
   const mode = checkoutMode(access);
-  const manual = access === 'ok' && flagOn(await getConfig(), 'manual_checkout_enabled');
+  const manual = access === 'ok' && flagOn(config, 'manual_checkout_enabled');
+  const manualFlow = memberFlow(manual, config);
   if (manual && (!hasDatabase() || !(await manualAvailable()))) {
     return Response.json({ error: 'El navegador de pago no está disponible. Probá más tarde.' }, { status: 503 });
   }
@@ -158,11 +161,13 @@ export async function POST(req: Request): Promise<Response> {
     handoffUrl,
     createdAt: Date.now(),
     mode,
+    ...(manualFlow ? { manualFlow } : {}),
   });
 
   const res: QuoteResponse = {
     ...(manual ? { checkoutKind: MANUAL_KIND, orderNonce: bytesToHex(nonce),
-      feeReleaseBasis: 'checkout_prepared' as const, viewerDurationSecs: VIEWER_SECONDS } : {}),
+      feeReleaseBasis: 'checkout_prepared' as const, viewerDurationSecs: VIEWER_SECONDS,
+      ...(manualFlow ? { manualFlow } : {}) } : {}),
     orderId,
     amount: usdcToBase(cents).toString(),
     amountCents: cents,

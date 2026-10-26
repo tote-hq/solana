@@ -1,5 +1,7 @@
 import RFB from '@novnc/novnc';
 
+const part = document.documentElement.dataset.part === 'form' || document.documentElement.dataset.part === 'screen'
+  ? document.documentElement.dataset.part : '';
 let rfb;
 let parentOrigin;
 let cardToken = '';
@@ -22,6 +24,7 @@ const copy = {
     kind: 'Tipo de tarjeta', debit: 'Débito', credit: 'Crédito',
     pan: 'Número de tarjeta', holder: 'Nombre y apellido', month: 'Mes', year: 'Año', cvv: 'Código de seguridad',
     hint: 'Mes y año se eligen acá. El teclado de arriba es para el captcha y la verificación.',
+    hintForm: 'Mes y año se eligen acá.',
     apply: 'Cargar en Día', update: 'Actualizar tarjeta', working: 'Cargando la tarjeta…',
     done: 'Tarjeta cargada en el checkout de Día. Podés corregirla y actualizarla hasta pagar.',
     partial: 'Día no tomó: ',
@@ -41,6 +44,7 @@ const copy = {
     kind: 'Card type', debit: 'Debit', credit: 'Credit',
     pan: 'Card number', holder: 'Name on card', month: 'Month', year: 'Year', cvv: 'Security code',
     hint: 'Choose the month and year here. The keyboard above is for the captcha and verification.',
+    hintForm: 'Choose the month and year here.',
     apply: 'Load into DIA', update: 'Update card', working: 'Loading the card…',
     done: 'Card loaded into the DIA checkout. You can correct it and update it until you pay.',
     partial: 'DIA did not take: ',
@@ -81,6 +85,7 @@ function fillSelects() {
 function applyCopy() {
   const t = text();
   document.documentElement.lang = lang;
+  if (part === 'form') document.title = lang === 'en' ? 'Card form' : 'Formulario de la tarjeta';
   document.getElementById('kinds').setAttribute('aria-label', t.kind);
   document.getElementById('lbl-debit').textContent = t.debit;
   document.getElementById('lbl-credit').textContent = t.credit;
@@ -89,7 +94,7 @@ function applyCopy() {
   document.getElementById('lbl-month').textContent = t.month;
   document.getElementById('lbl-year').textContent = t.year;
   document.getElementById('lbl-cvv').textContent = t.cvv;
-  document.getElementById('card-hint').textContent = t.hint;
+  document.getElementById('card-hint').textContent = part === 'form' ? t.hintForm : t.hint;
   if (!apply.disabled) apply.textContent = applied ? t.update : t.apply;
   fillSelects();
 }
@@ -107,6 +112,7 @@ function setStatus(message, ok) {
 }
 
 function lockForm() {
+  apply.setAttribute('aria-busy', 'false');
   apply.textContent = applied ? text().update : text().apply;
   form.querySelectorAll('input, select, button').forEach(el => { el.disabled = true; });
   setStatus(text().locked, false);
@@ -118,11 +124,16 @@ function ready() {
 
 window.addEventListener('message', event => {
   if (!permitted || event.source !== parent || event.origin !== parentOrigin || event.data?.type !== 'changuito-viewer-connect') return;
-  const { jobId, ticket } = event.data;
-  if (!/^[0-9a-f]{32}$/.test(jobId) || !/^[A-Za-z0-9_-]{40,64}$/.test(ticket)) return;
+  const { jobId } = event.data;
+  if (!/^[0-9a-f]{32}$/.test(jobId)) return;
+  const ticket = event.data.ticket || '';
+  const ticketOk = /^[A-Za-z0-9_-]{40,64}$/.test(ticket);
+  if (part !== 'form' && !ticketOk) return;
   cardToken = /^[A-Za-z0-9_-]{40,64}$/.test(event.data.cardToken || '') ? event.data.cardToken : '';
   lang = event.data.lang === 'en' ? 'en' : 'es';
   applyCopy();
+  form.dataset.jobId = jobId;
+  if (!ticketOk) return;
   rfb?.disconnect();
   const url = new URL(`/viewer/${jobId}/socket`, location.origin);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -185,11 +196,12 @@ apply.addEventListener('click', async () => {
     first.focus();
     return;
   }
-  if (!rfb || !cardToken || !form.dataset.jobId) {
+  if ((part !== 'form' && !rfb) || !cardToken || !form.dataset.jobId) {
     setStatus(text().offline, false);
     return;
   }
   apply.disabled = true;
+  apply.setAttribute('aria-busy', 'true');
   apply.textContent = text().working;
   try {
     const response = await fetch(`/viewer/${form.dataset.jobId}/card`, {
@@ -222,11 +234,14 @@ apply.addEventListener('click', async () => {
     applied = true;
     cvv.value = '';
     setStatus(text().done, true);
+    cardStatus.focus();
+    if (permitted) parent.postMessage({ type: 'changuito-card-applied' }, parentOrigin);
   } catch {
     setStatus(text().failed, false);
   } finally {
     if (!apply.disabled) return;
     if (form.querySelector('input:disabled')) return;
+    apply.setAttribute('aria-busy', 'false');
     apply.disabled = false;
     apply.textContent = applied ? text().update : text().apply;
   }
