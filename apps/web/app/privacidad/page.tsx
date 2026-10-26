@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { SUPPORT_EMAIL } from '@changuito/trust';
+
 import { LangToggle } from '../../components/LangToggle';
 import { LangProvider } from '../../components/LangProvider';
 import { ScrollPage } from '../../components/ScrollPage';
@@ -55,6 +57,9 @@ export default async function PrivacyPage() {
           <h2 id="privacy-contact">{copy.contactHeading}</h2>
           <p>{copy.contactLead}</p>
           <ul className="legal-contact">
+            <li>
+              <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            </li>
             <li>
               <a href={BUG} target="_blank" rel="noopener noreferrer">
                 {BUG}

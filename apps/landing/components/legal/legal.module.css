@@ -178,6 +178,11 @@
   overflow-wrap: anywhere;
 }
 
+.section a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .footer {
   max-width: 760px;
   margin: 0 auto;

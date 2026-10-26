@@ -2254,6 +2254,13 @@ html.doc-scroll body {
 .legal-page a {
   color: var(--text);
 }
+.legal-contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .legal-back a {
   display: inline-flex;
   align-items: center;

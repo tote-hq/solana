@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import { Fragment, type ReactNode } from 'react';
 
 import { FounderTrust } from '@changuito/trust/ui';
 
 import { canonicalUrl, INDEXABLE_ROBOTS, OG_IMAGE } from '../../lib/seo';
-import { LEGAL_PATHS, LEGAL_UPDATED, legalCopy, type LegalDoc, type LegalLang } from '../../lib/legal';
+import { LEGAL_PATHS, LEGAL_UPDATED, SUPPORT_EMAIL, legalCopy, type LegalDoc, type LegalLang } from '../../lib/legal';
 
 import styles from './legal.module.css';
 
@@ -32,6 +33,18 @@ export function legalMetadata(doc: LegalDoc, lang: LegalLang): Metadata {
       images: [OG_IMAGE],
     },
   };
+}
+
+/** Turns the support address into a mailto link wherever the copy names it. */
+function withSupportLink(text: string): ReactNode {
+  if (!text.includes(SUPPORT_EMAIL)) return text;
+  const parts = text.split(SUPPORT_EMAIL);
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {part}
+      {index < parts.length - 1 ? <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> : null}
+    </Fragment>
+  ));
 }
 
 /** Terms or privacy, in one language. Server-rendered static text, no client JS. */
@@ -87,7 +100,7 @@ export function LegalPage({ doc, lang }: { doc: LegalDoc; lang: LegalLang }) {
               {section.heading}
             </h2>
             {section.paragraphs.map((text) => (
-              <p key={text}>{text}</p>
+              <p key={text}>{withSupportLink(text)}</p>
             ))}
           </section>
         ))}

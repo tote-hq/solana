@@ -36,3 +36,9 @@ export const TRUST_LINE = `${COPYRIGHT_LINE}${TRUST_SEPARATOR}${FOUNDER_SENTENCE
 
 /** Spoken after each name. The visible label stays the name itself. */
 export const NEW_TAB_HINT = 'se abre en una pestaña nueva';
+
+/**
+ * Temporary support address until a Changuito workspace mailbox exists.
+ * Landing legal pages and the app privacy page both read this one constant.
+ */
+export const SUPPORT_EMAIL = 'contact@simonethg.com';

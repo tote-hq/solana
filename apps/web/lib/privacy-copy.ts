@@ -6,6 +6,9 @@ import type { Lang } from './lang.ts';
  * Written from the code, not from a legal review. The gaps section is a list
  * for the person who publishes the app; it is not a promise that those points
  * are settled.
+ *
+ * The contact address is not copied here. The page renders SUPPORT_EMAIL
+ * from @changuito/trust as a mailto link under the contact heading.
  */
 export interface PrivacySection {
   id: string;
@@ -88,10 +91,11 @@ const ES: PrivacyCopy = {
     'Lo escrito en la cadena no se puede borrar, aunque se borre la cuenta de Changuito.',
     'Borrar la cuenta de Changuito no borra la cuenta de Día.',
     'Si la API de borrado de Privy falla, el ingreso por email puede seguir existiendo. La pantalla deja reintentar después de volver a entrar.',
-    'No hay un email dedicado a privacidad. Los contactos que ya existen están abajo.',
+    'El correo de abajo es temporario, hasta que exista el espacio de trabajo de Changuito.',
   ],
   contactHeading: 'Contacto',
-  contactLead: 'Para un problema de la aplicación, el canal que ya existe es el reporte de errores. También están las cuentas públicas.',
+  contactLead:
+    'Para privacidad o un problema de la aplicación, escribinos al correo de abajo. El reporte de errores y las cuentas públicas siguen disponibles.',
 };
 
 const EN: PrivacyCopy = {
@@ -157,10 +161,11 @@ const EN: PrivacyCopy = {
     'What is written on the chain cannot be erased, even if the Changuito account is deleted.',
     'Deleting the Changuito account does not delete the Día account.',
     'If Privy’s delete API fails, the email sign-in can remain. The screen lets you retry after signing in again.',
-    'There is no dedicated privacy email. The contacts that already exist are below.',
+    'The address below is temporary, until a Changuito workspace mailbox exists.',
   ],
   contactHeading: 'Contact',
-  contactLead: 'For a problem with the app, the channel that already exists is the bug report. The public accounts are there too.',
+  contactLead:
+    'For privacy or a problem with the app, write to the address below. The bug report and the public accounts are still there.',
 };
 
 export function privacyCopy(lang: Lang): PrivacyCopy {

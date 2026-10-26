@@ -6,15 +6,19 @@
  * No legal entity, address or registration number is stated because none
  * exists in the repositories.
  *
- * SUPPORT_EMAIL is a placeholder until the publisher chooses an address.
+ * The support address is SUPPORT_EMAIL from @changuito/trust. It is
+ * temporary until a Changuito workspace mailbox exists.
  */
+import { SUPPORT_EMAIL } from '@changuito/trust';
+
 import { SITE_URL } from './copy.ts';
+
+export { SUPPORT_EMAIL };
 
 export type LegalLang = 'es' | 'en';
 export type LegalDoc = 'terms' | 'privacy';
 
 export const LEGAL_UPDATED = '2026-10-25';
-export const SUPPORT_EMAIL = '{{SUPPORT_EMAIL}}';
 
 export interface LegalSection {
   id: string;
