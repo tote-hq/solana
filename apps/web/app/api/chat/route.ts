@@ -1,4 +1,5 @@
 import { newTurnState, runTurn } from '@/lib/agent/loop';
+import { AnthropicAuthError, searchUnavailableCopy } from '@/lib/agent/providers/anthropic';
 import { isChatImage } from '@/lib/chat-image';
 import { turnStore } from '@/lib/agent/turn-store';
 import { archiveChat, chatTitle } from '@/lib/chat-archive';
@@ -178,7 +179,15 @@ export async function POST(req: Request): Promise<Response> {
       } catch (e) {
         emit({
           t: 'error',
-          message: e instanceof Error ? e.message : String(e),
+          // A rejected key used to arrive as the provider's raw JSON, request
+          // id included. The shopper gets one sentence, in the language of
+          // the footer. Anything else still surfaces its own message.
+          message:
+            e instanceof AnthropicAuthError
+              ? searchUnavailableCopy(lang)
+              : e instanceof Error
+                ? e.message
+                : String(e),
           recoverable: true,
         });
       } finally {
