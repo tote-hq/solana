@@ -107,6 +107,7 @@ class JobIn(BaseModel):
     mode: Literal['legacy', 'manual'] = 'legacy'
     buyer: str | None = Field(default=None, pattern=r'^[1-9A-HJ-NP-Za-km-z]{32,44}$')
     escrow_deadline: int | None = None
+    flow: Literal['viewer', 'guided', 'headless'] = 'viewer'
 
 
 def auth(authorization: str = Header(default="")) -> None:
@@ -186,10 +187,11 @@ async def create(body: JobIn) -> dict:
         record, created = sessions.store.create(body.order_id, body.buyer)
         if created:
             jobs[record['job_id']] = {'mode': 'manual', 'items': [i.model_dump() for i in body.items],
-                                      'escrow_deadline': body.escrow_deadline,
+                                      'escrow_deadline': body.escrow_deadline, 'flow': body.flow,
                                       'shopper': body.shopper.model_dump(exclude_none=True)}
             await queue.put(record['job_id'])
-        return {'job_id': record['job_id']}
+        stored = jobs.get(record['job_id'], {}).get('flow', body.flow)
+        return {'job_id': record['job_id'], 'flow': stored if stored in ('viewer', 'guided', 'headless') else 'viewer'}
     # Idempotent per order: a retried start must not shop twice.
     for j in jobs.values():
         if j["order_id"] == body.order_id:
@@ -219,6 +221,7 @@ async def manual_worker(job_id: str, job: dict):
         job.clear()
         return
     sessions.store.update(job_id, status='running', preparation='preparing')
+    sessions.note_flow(job_id, job.get('flow'))
 
     def phase(name):
         sessions.store.update(job_id, phase=name)
@@ -257,12 +260,23 @@ async def manual_worker(job_id: str, job: dict):
         jobs.pop(job_id, None)
 
 
+class TicketIn(BaseModel):
+    purpose: Literal['card', 'browser', 'both'] = 'both'
+
+
 @app.post('/jobs/{job_id}/ticket', dependencies=[Depends(auth)])
-async def ticket(job_id: str):
+async def ticket(job_id: str, body: TicketIn = TicketIn()):
     if not sessions.store or sessions.active != job_id:
         raise HTTPException(409, 'session unavailable')
     try:
-        return {'ticket': sessions.store.ticket(job_id), 'cardToken': sessions.store.card_grant(job_id)}
+        # A card grant and a screen ticket are separate. Asking for the form
+        # must not burn the single-use screen ticket.
+        out = {}
+        if body.purpose in ('browser', 'both'):
+            out['ticket'] = sessions.store.ticket(job_id)
+        if body.purpose in ('card', 'both'):
+            out['cardToken'] = sessions.store.card_grant(job_id)
+        return out
     except ValueError:
         raise HTTPException(409, 'session unavailable') from None
 

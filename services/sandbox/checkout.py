@@ -586,6 +586,69 @@ async def pay(sb: Sandbox, job_card: dict | None) -> dict:
     return {"payment": "error", "detail": "no answer from the store 90 s after pressing pay"}
 
 
+async def _image_challenge(page: Page) -> bool:
+    """True when the store is showing an image challenge. We do not solve those."""
+    for frame in page.frames:
+        if 'recaptcha' not in (frame.url or ''):
+            continue
+        try:
+            images = frame.locator('.rc-imageselect-target, #rc-imageselect')
+            if await images.count() and await images.first.is_visible():
+                return True
+        except Exception:
+            continue
+    return False
+
+
+async def complete_store_recaptcha(page: Page) -> str:
+    """Run the store's own checkbox or grecaptcha. Returns 'challenge' or 'ready'.
+
+    The token stays in the page. Nothing here reads it, logs it, or sends it anywhere.
+    """
+    if await _image_challenge(page):
+        return 'challenge'
+    for frame in page.frames:
+        if 'recaptcha' not in (frame.url or ''):
+            continue
+        try:
+            anchor = frame.locator('#recaptcha-anchor')
+            if await anchor.count() and await anchor.first.is_visible():
+                await anchor.first.click(timeout=4000)
+                break
+        except Exception:
+            continue
+    try:
+        await page.wait_for_timeout(1500)
+    except Exception:
+        pass
+    if await _image_challenge(page):
+        return 'challenge'
+    try:
+        await page.evaluate('''() => {
+          const g = window.grecaptcha;
+          try {
+            if (g && g.enterprise && typeof g.enterprise.execute === 'function') { void g.enterprise.execute(); return; }
+            if (g && typeof g.execute === 'function') void g.execute();
+          } catch (e) {}
+        }''')
+    except Exception:
+        pass
+    return 'ready'
+
+
+async def press_store_pay(sb: Sandbox) -> bool:
+    """Press Finalizar compra. The caller already filled the card."""
+    page = sb.main
+    await _billing_same_as_delivery(page)
+    await _accept_terms(page)
+    button = await _pay_button(page)
+    if not button:
+        return False
+    sb.allow_payment = True
+    await button.click()
+    return True
+
+
 async def prepare_manual(sb: Sandbox, lines: list[dict]) -> None:
     """Validate the complete basket/delivery and expose only an empty new-card form."""
     from collections import Counter

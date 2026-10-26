@@ -19,6 +19,8 @@ import { useWallet } from '../lib/use-wallet.ts';
 import { useLang } from './LangProvider';
 import { PasswordInput } from './PasswordInput';
 import { ManualPaymentPanel } from './ManualPaymentPanel';
+import { GuidedCheckout } from './GuidedCheckout';
+import { flowLabels, flowRailIndex, flowScreen } from '../lib/checkout/flow.ts';
 
 /**
  * From a full basket to a settled escrow, in four steps:
@@ -94,6 +96,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [step, setStep] = useState<Step>('login');
   const [error, setError] = useState<string | null>(null);
+  const [cardSent, setCardSent] = useState(false);
   const [funding, setFunding] = useState(false);
   const [openSig, setOpenSig] = useState<string | null>(null);
   const [pendingOpen, setPendingOpen] = useState<OpenSubmission | null>(null);
@@ -349,9 +352,17 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   // Closing mid-purchase is allowed: the server keeps shopping and the escrow
   // closes either way. Only the view goes.
   const close = step === 'done' || demoFinished ? finish : onClose;
-  const railAt = step === 'login' ? 0 : step === 'review' || step === 'locking' ? 1 : 2;
+  const rawFlow = status?.manualFlow ?? quote?.manualFlow;
+  const steppedFlow = rawFlow === 'guided' || rawFlow === 'headless' ? rawFlow : null;
+  const flowNow = steppedFlow ? flowScreen(steppedFlow, status, cardSent) : 'progress';
+  const railLabels = steppedFlow ? flowLabels(lang === 'en' ? 'en' : 'es', steppedFlow) : copy.steps;
+  const railAt = steppedFlow
+    ? flowRailIndex(step, flowNow)
+    : step === 'login' ? 0 : step === 'review' || step === 'locking' ? 1 : 2;
   const closeSig = status?.closeSig ?? null;
   const lockSig = status?.openSig ?? openSig;
+
+  useEffect(() => { setCardSent(false); }, [quote?.orderId]);
 
   return (
     <div className="modal-backdrop" onClick={close}>
@@ -365,14 +376,11 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
       >
         <header className="modal-head">
           <h2>{copy.title}</h2>
-          <button type="button" className="modal-x" onClick={close} aria-label={copy.close}>
-            ×
-          </button>
         </header>
 
         <div className="ck-step">
           <ol className="ck-rail">
-            {copy.steps.map((label, i) => (
+            {railLabels.map((label, i) => (
               <li
                 key={label}
                 className={i === railAt ? 'ck-rail-step ck-rail-now' : i < railAt ? 'ck-rail-step ck-rail-done' : 'ck-rail-step'}
@@ -527,7 +535,19 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
             </div>
           ) : null}
 
-          {step === 'shopping' && manual && quote ? <ManualPaymentPanel orderId={quote.orderId} status={status} onUpdate={setStatus} /> : null}
+          {step === 'shopping' && manual && quote && steppedFlow ? (
+            <GuidedCheckout
+              orderId={quote.orderId}
+              flow={steppedFlow}
+              status={status}
+              pesos={cart.total.display}
+              cardSent={cardSent}
+              onUpdate={setStatus}
+              onCard={() => setCardSent(true)}
+            />
+          ) : null}
+
+          {step === 'shopping' && manual && quote && !steppedFlow ? <ManualPaymentPanel orderId={quote.orderId} status={status} onUpdate={setStatus} /> : null}
 
           {step === 'shopping' && !manual ? (
             <div className="ck-pay" data-testid="checkout-shopping-step">
@@ -605,6 +625,9 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
             </div>
           ) : null}
         </div>
+        <button type="button" className="modal-x ck-close" onClick={close} aria-label={copy.close}>
+          ×
+        </button>
       </section>
     </div>
   );
