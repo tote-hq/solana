@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { PUBLIC_LEGAL } from '@changuito/trust';
 
 import { BetaOnboarding } from '../components/BetaOnboarding';
@@ -9,11 +10,12 @@ import { LangToggle } from '../components/LangToggle';
 import { NetworkProvider } from '../components/NetworkProvider';
 import { ShopProvider } from '../components/ShopProvider';
 import { TopBar } from '../components/TopBar';
-import { WalletProvider } from '../components/WalletProvider';
+import { WalletGate } from '../components/WalletGate';
 import { COPYRIGHT_LINE } from '../lib/founder-trust-copy';
 import { turnstileSiteKey } from '../lib/human-gate';
 import { inLang } from '../lib/lang.ts';
 import { langFromCookie } from '../lib/lang-server.ts';
+import { isSolanaMobileWebShell } from '../lib/privy-login.ts';
 
 // The site key has to be read per request. A static prerender baked siteKey:""
 // and the widget never appeared, even after the env var existed at runtime.
@@ -25,6 +27,14 @@ export default async function Home() {
   // Read here rather than in a provider effect so the first HTML is already in
   // the shopper's language. See components/LangProvider.tsx.
   const lang = await langFromCookie();
+  // The shell's marker is on the request, so the first HTML already omits Privy.
+  let userAgent: string | null = null;
+  try {
+    userAgent = (await headers()).get('user-agent');
+  } catch {
+    userAgent = null;
+  }
+  const nativeWalletOnly = isSolanaMobileWebShell(userAgent);
   return (
     // Outermost, above the network: every provider below draws words, and the
     // mode copy is one of the things that gets translated.
@@ -33,7 +43,7 @@ export default async function Home() {
           which key that provider is built with, so it has to be decided
           above it. */}
       <NetworkProvider>
-        <WalletProvider>
+        <WalletGate nativeWalletOnly={nativeWalletOnly}>
           <ShopProvider>
             {/* Above the deck and outside it: the bar spans the window at
                 every width, including the three-column one. */}
@@ -73,7 +83,7 @@ export default async function Home() {
               </main>
             </Deck>
           </ShopProvider>
-        </WalletProvider>
+        </WalletGate>
       </NetworkProvider>
     </LangProvider>
   );

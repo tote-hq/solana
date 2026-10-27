@@ -13,11 +13,16 @@ import { createContext, useContext } from 'react';
  * fact. A context default is the cheapest way to keep hook order fixed.
  */
 export interface WalletState {
-  /** This build has a Privy app id at all. */
+  /** Sign-in can happen: Privy is configured, or this is the phone-only shell. */
   enabled: boolean;
-  /** Privy finished restoring its session. Before this, a Privy `address` means nothing. */
+  /** Privy finished restoring its session, or the phone session check finished. */
   ready: boolean;
   authenticated: boolean;
+  /**
+   * The Seeker shell. Sign-in, disconnect and escrow signatures go through
+   * the phone account only. Privy is not mounted.
+   */
+  nativeOnly: boolean;
   /**
    * `privy` is an embedded or linked external wallet authenticated by Privy. `mobile` is a phone wallet that signed
    * the server's message. `off` is signed out. When both exist, `mobile` wins
@@ -49,6 +54,7 @@ export const WALLET_OFF: WalletState = {
   enabled: false,
   ready: true,
   authenticated: false,
+  nativeOnly: false,
   kind: 'off',
   address: null,
   email: null,

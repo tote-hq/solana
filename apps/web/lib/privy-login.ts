@@ -18,8 +18,28 @@ export const DEFAULT_PRIVY_LOGIN_METHODS = ['email', 'google', 'wallet'] as cons
 
 export type PrivyLoginMethod = (typeof DEFAULT_PRIVY_LOGIN_METHODS)[number];
 
-/** Appended by solana-mobile webshell's `appendUserAgentMarker`. */
+/**
+ * Appended by the Seeker shell (`appendUserAgentMarker` in `me.changuito.sol`).
+ * The same marker `@solana-mobile/wallet-standard-mobile` looks for
+ * (`isSolanaMobileWebShell`) so local association skips the browser permission
+ * prompt. It is the only signal that this document is inside that app: the
+ * shell strips `; wv` before the page loads, so a generic WebView token is
+ * neither necessary nor sufficient.
+ */
 export const SOLANA_MOBILE_WEB_SHELL_MARKER = 'Solana Mobile Web Shell';
+
+/**
+ * True only inside the Solana Mobile Web Shell.
+ *
+ * A normal browser, including Chrome on a Seeker and any other Android
+ * WebView, stays false so Privy keeps loading there. Null and empty are
+ * false: the server can call this with a missing `User-Agent` and the
+ * answer matches the first client render.
+ */
+export function isSolanaMobileWebShell(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  return userAgent.includes(SOLANA_MOBILE_WEB_SHELL_MARKER);
+}
 
 /**
  * Android WebView, including the Seeker APK (`me.changuito.sol`).

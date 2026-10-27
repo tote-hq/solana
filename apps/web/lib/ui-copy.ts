@@ -92,6 +92,19 @@ export interface WalletCopy {
   phoneCta: string;
   /** Spoken name: which account the button signs in. */
   phoneAria: string;
+  /** Seeker shell, signed out: one line beside the button on a wide bar. */
+  nativeHint: string;
+  /** Seeker shell sign-in button. */
+  nativeCta: string;
+  /** Spoken name for that button. */
+  nativeAria: string;
+  /** While the phone account sheet is open. */
+  nativeBusy: string;
+  /** After Salir, until the next successful sign-in. */
+  nativeSignedOut: string;
+  /** Checkout step when the only account is the one on the phone. */
+  nativeLoginLead: string;
+  nativeLoginCta: string;
 }
 
 export interface PaymentCopy {
@@ -303,6 +316,13 @@ const ES: UiCopy = {
     signOutAria: 'Salir',
     phoneCta: 'Teléfono',
     phoneAria: 'Entrar con la cuenta de este teléfono',
+    nativeHint: 'Cuenta de este teléfono',
+    nativeCta: 'Entrar',
+    nativeAria: 'Entrar con la cuenta de este teléfono',
+    nativeBusy: 'Entrando…',
+    nativeSignedOut: 'Saliste. Cuando quieras, volvé a entrar con la cuenta de este teléfono.',
+    nativeLoginLead: 'Entrá con la cuenta de este teléfono. Con esa cuenta firmás el pago.',
+    nativeLoginCta: 'Entrar con este teléfono',
   },
   payment: {
     aria: 'Confirmar el pago',
@@ -503,6 +523,13 @@ const EN: UiCopy = {
     signOutAria: 'Sign out',
     phoneCta: 'Phone',
     phoneAria: 'Sign in with the account on this phone',
+    nativeHint: 'Account on this phone',
+    nativeCta: 'Sign in',
+    nativeAria: 'Sign in with the account on this phone',
+    nativeBusy: 'Signing in…',
+    nativeSignedOut: 'You signed out. Whenever you want, sign in again with the account on this phone.',
+    nativeLoginLead: 'Sign in with the account on this phone. That account signs the payment.',
+    nativeLoginCta: 'Sign in with this phone',
   },
   payment: {
     aria: 'Confirm the payment',

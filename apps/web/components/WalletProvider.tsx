@@ -5,11 +5,11 @@ import { toSolanaWalletConnectors, useSignTransaction, useWallets } from '@privy
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { MWA_ADDRESS_KEY } from '../lib/mwa-key.ts';
 import { currentUserAgent, DEFAULT_PRIVY_LOGIN_METHODS, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
 import { linkedSolanaWallet, restoredWalletSelection, selectedSolanaWallet, WALLET_SELECTION_KEY, type WalletSelection } from '../lib/privy-wallet.ts';
 import { DEFAULT_RPC } from '../lib/solana.ts';
 import { WalletContext, type WalletState } from '../lib/use-wallet.ts';
+import { useMobileSession } from './mobile-session.tsx';
 
 const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
 const RPC = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_RPC;
@@ -20,9 +20,10 @@ const WS = RPC.replace(/^http/, 'ws');
  * login. The wallet only signs; the server pays the fee and sends (see
  * app/api/checkout/open).
  *
- * Google stays available inside the Seeker WebShell. The app keeps
- * accounts.google.com and auth.privy.io in the WebView and strips the
- * WebView user-agent tokens. See `privyLoginMethods`.
+ * This module is not loaded inside the Seeker shell. `WalletGate` imports it
+ * only after the user agent is not the Solana Mobile Web Shell, so Privy's
+ * scripts never start there. In every other browser the login methods stay
+ * email, Google and external wallets. See `privyLoginMethods`.
  *
  * A phone wallet (Mobile Wallet Adapter) is registered in the browser only,
  * and can sign in even when this build has no Privy app id. `registerMwa`
@@ -70,44 +71,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-function useMobileSession() {
-  const [mobileAddress, setMobileAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(MWA_ADDRESS_KEY);
-      if (saved) setMobileAddress(saved);
-    } catch {
-      /* private mode: the cookie, if any, is still httpOnly and unused here */
-    }
-  }, []);
-
-  const clearMobile = useCallback(() => {
-    setMobileAddress(null);
-    try {
-      sessionStorage.removeItem(MWA_ADDRESS_KEY);
-    } catch {
-      /* already gone */
-    }
-    void import('../lib/mobile-wallet-client.ts')
-      .then((m) => m.disconnectMobileWallet())
-      .catch(() => {});
-  }, []);
-
-  const loginMobile = useCallback(async () => {
-    const { signInWithMobileWallet } = await import('../lib/mobile-wallet-client.ts');
-    const address = await signInWithMobileWallet();
-    try {
-      sessionStorage.setItem(MWA_ADDRESS_KEY, address);
-    } catch {
-      /* the httpOnly cookie is the session; this key only restores the bar */
-    }
-    setMobileAddress(address);
-  }, []);
-
-  return { mobileAddress, loginMobile, clearMobile };
-}
-
 function MobileOnly({ children }: { children: React.ReactNode }) {
   const mobile = useMobileSession();
   const signTransaction = useCallback(async (tx: Uint8Array) => {
@@ -120,6 +83,7 @@ function MobileOnly({ children }: { children: React.ReactNode }) {
       enabled: false,
       ready: true,
       authenticated: Boolean(mobile.mobileAddress),
+      nativeOnly: false,
       kind: mobile.mobileAddress ? 'mobile' : 'off',
       address: mobile.mobileAddress,
       email: null,
@@ -193,6 +157,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
       enabled: true,
       ready: ready && !loginPending && (!authenticated || (walletsReady && restoredUser === user?.id)),
       authenticated: Boolean(address),
+      nativeOnly: false,
       kind: mobile.mobileAddress ? 'mobile' : address ? 'privy' : 'off',
       address,
       // A Google login has no `email` account, only `google.email`; both feed the avatar's initials.
