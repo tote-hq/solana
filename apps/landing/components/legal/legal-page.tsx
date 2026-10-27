@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from 'react';
 import { FounderTrust } from '@changuito/trust/ui';
 
 import { canonicalUrl, INDEXABLE_ROBOTS, OG_IMAGE } from '../../lib/seo';
-import { LEGAL_PATHS, LEGAL_UPDATED, SUPPORT_EMAIL, legalCopy, type LegalDoc, type LegalLang } from '../../lib/legal';
+import { LEGAL_PATHS, SUPPORT_EMAIL, legalCopy, type LegalDoc, type LegalLang } from '../../lib/legal';
 
 import styles from './legal.module.css';
 
@@ -55,7 +55,7 @@ export function LegalPage({ doc, lang }: { doc: LegalDoc; lang: LegalLang }) {
     month: 'long',
     day: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(`${LEGAL_UPDATED}T12:00:00Z`));
+  }).format(new Date(`${copy.updated}T12:00:00Z`));
 
   return (
     <div className={styles.page} lang={lang === 'es' ? 'es-AR' : 'en'} data-testid={`legal-${doc}-${lang}`} data-legal="">
@@ -81,7 +81,7 @@ export function LegalPage({ doc, lang }: { doc: LegalDoc; lang: LegalLang }) {
       <main id="contenido" className={styles.main} tabIndex={-1}>
         <h1 className={styles.title}>{copy.title}</h1>
         <p className={styles.updated}>
-          {copy.updatedLabel}: <time dateTime={LEGAL_UPDATED}>{date}</time>
+          {copy.updatedLabel}: <time dateTime={copy.updated}>{date}</time>
         </p>
         <p className={styles.intro}>{copy.intro}</p>
         <nav aria-label={copy.contentsLabel} className={styles.toc}>
@@ -107,9 +107,14 @@ export function LegalPage({ doc, lang }: { doc: LegalDoc; lang: LegalLang }) {
       </main>
       <footer className={styles.footer}>
         <a href="/">{copy.backLabel}</a>
-        <a href={LEGAL_PATHS[doc === 'terms' ? 'privacy' : 'terms'][lang]}>
-          {legalCopy(doc === 'terms' ? 'privacy' : 'terms', lang).title}
-        </a>
+        {(['terms', 'privacy', 'deletion'] as const)
+          .filter((item) => item !== doc)
+          .map((item) => (
+            <a key={item} href={LEGAL_PATHS[item][lang]}>
+              {legalCopy(item, lang).title}
+            </a>
+          ))}
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
         <FounderTrust className={styles.fine} />
       </footer>
     </div>

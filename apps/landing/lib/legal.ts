@@ -1,5 +1,5 @@
 /**
- * Terms of Service and Privacy Policy copy for www.changuito.me.
+ * Terms of Service, Privacy Policy and account-deletion copy for www.changuito.me.
  *
  * Written from what the code does (apps/web/lib/privacy-copy.ts and this
  * landing's waitlist, bug report and analytics), not from a legal review.
@@ -16,9 +16,11 @@ import { SITE_URL } from './copy.ts';
 export { SUPPORT_EMAIL };
 
 export type LegalLang = 'es' | 'en';
-export type LegalDoc = 'terms' | 'privacy';
+export type LegalDoc = 'terms' | 'privacy' | 'deletion';
 
 export const LEGAL_UPDATED = '2026-10-25';
+/** Account-deletion page. Terms and privacy keep LEGAL_UPDATED. */
+export const DELETION_UPDATED = '2026-10-27';
 
 export interface LegalSection {
   id: string;
@@ -40,11 +42,13 @@ export interface LegalCopy {
   backLabel: string;
   skipLabel: string;
   contentsLabel: string;
+  updated: string;
 }
 
 export const LEGAL_PATHS: Record<LegalDoc, Record<LegalLang, string>> = {
   terms: { en: '/terms', es: '/terminos' },
   privacy: { en: '/privacy', es: '/privacidad' },
+  deletion: { en: '/delete-account', es: '/eliminar-cuenta' },
 };
 
 const UI = {
@@ -423,6 +427,94 @@ const PRIVACY_ES: readonly LegalSection[] = [
   { id: 'contact', heading: '12. Contacto', paragraphs: [CONTACT_ES] },
 ];
 
+const DELETE_EN: readonly LegalSection[] = [
+  {
+    id: 'app',
+    heading: '1. Ask in the app',
+    paragraphs: [
+      'If you can sign in at sol.changuito.me, including from the Changuito app on Solana Seeker (me.changuito.sol, which opens that site), open your profile, choose “Delete account and data”, read what will be removed, and confirm with “Yes, delete”.',
+      'Changuito deletes the data below as part of that confirmation, and then signs you out. If it fails, the screen says so and the account is still there: try again. If your email or Google sign-in (Privy) cannot be deleted, the screen says that too. Sign in again and retry. A sign-in that only used a Solana wallet has no Privy user to delete.',
+    ],
+  },
+  {
+    id: 'email',
+    heading: '2. Ask by email',
+    paragraphs: [
+      `If you cannot sign in, write to ${SUPPORT_EMAIL} with the subject “Delete my Changuito account”. Include the email you used to sign in, or your Solana address, so we can find the account.`,
+      `We delete the Changuito data we can match to that request within 30 days, and we reply to the same email when it is done. If we cannot match it, we reply and ask for the missing detail. The 30 days start once we can identify the account. ${SUPPORT_EMAIL} is temporary until a Changuito mailbox exists.`,
+    ],
+  },
+  {
+    id: 'deleted',
+    heading: '3. What we delete',
+    paragraphs: [
+      'The encrypted supermarket profile you saved in Changuito (for Día: email, password, DNI and postal code). Chat transcripts stored for your wallet address, orders tied to them, and order rows stored under that address. Saved checkouts. The usage counter. The session cookie, and Changuito data in the browser where you confirm. The Privy user, when Privy accepts the deletion.',
+      'An email request also covers waitlist and bug-report rows on www.changuito.me when they use an email we can match. The button in the app does not delete those rows, because they are not tied to the wallet.',
+    ],
+  },
+  {
+    id: 'kept',
+    heading: '4. What we cannot delete',
+    paragraphs: [
+      'Transactions already written on Solana, including the USDC escrow. They are public and cannot be erased by Changuito or by you. Deleting the account does not move funds.',
+      'Your account at the supermarket (for example Día). A chat turn that was not archived yet expires on its own within about an hour. Changuito data that exists only in another device’s browser stays there until you clear that browser.',
+      'Copies a third party already has under its own policy (the supermarket, the AI provider, Privy, or an analytics provider). We delete what we store. We do not control their systems.',
+    ],
+  },
+  {
+    id: 'time',
+    heading: '5. How long it takes',
+    paragraphs: [
+      'In the app, deletion of Changuito’s copy runs when you confirm. By email, we complete a request we can match within 30 days.',
+    ],
+  },
+  { id: 'contact', heading: '6. Contact', paragraphs: [`Write to ${SUPPORT_EMAIL}.`] },
+];
+
+const DELETE_ES: readonly LegalSection[] = [
+  {
+    id: 'app',
+    heading: '1. Pedirlo en la app',
+    paragraphs: [
+      'Si podés entrar en sol.changuito.me, también desde la app de Changuito en Solana Seeker (me.changuito.sol, que abre ese sitio), abrí tu perfil, elegí “Eliminar cuenta y datos”, leé qué se va a borrar y confirmá con “Sí, eliminar”.',
+      'Changuito borra los datos de abajo en esa confirmación y después cierra la sesión. Si falla, la pantalla lo dice y la cuenta sigue: probá de nuevo. Si el ingreso por email o Google (Privy) no se puede borrar, la pantalla también lo dice. Volvé a entrar e intentá otra vez. Un ingreso que solo usó una billetera de Solana no tiene un usuario de Privy para borrar.',
+    ],
+  },
+  {
+    id: 'email',
+    heading: '2. Pedirlo por correo',
+    paragraphs: [
+      `Si no podés entrar, escribinos a ${SUPPORT_EMAIL} con el asunto “Eliminar mi cuenta de Changuito”. Incluí el email con el que entraste, o tu dirección de Solana, para que encontremos la cuenta.`,
+      `Borramos los datos de Changuito que podamos asociar a ese pedido dentro de los 30 días, y respondemos a ese mismo correo cuando está hecho. Si no podemos asociarlo, respondemos y pedimos el dato que falta. Los 30 días empiezan cuando podemos identificar la cuenta. ${SUPPORT_EMAIL} es temporario, hasta que exista un correo de Changuito.`,
+    ],
+  },
+  {
+    id: 'deleted',
+    heading: '3. Qué borramos',
+    paragraphs: [
+      'El perfil cifrado del supermercado que guardaste en Changuito (para Día: email, contraseña, DNI y código postal). Los chats guardados para tu dirección, los pedidos asociados y las filas de pedidos guardadas bajo esa dirección. Los checkouts guardados. El contador de uso. La cookie de sesión y los datos de Changuito en el navegador donde confirmás. El usuario de Privy, cuando Privy acepta el borrado.',
+      'Un pedido por correo también incluye las filas de la lista de espera y de reportes de errores en www.changuito.me cuando usan un email que podemos asociar. El botón de la app no borra esas filas, porque no están atadas a la billetera.',
+    ],
+  },
+  {
+    id: 'kept',
+    heading: '4. Qué no podemos borrar',
+    paragraphs: [
+      'Las transacciones que ya quedaron escritas en Solana, incluido el escrow en USDC. Son públicas y ni Changuito ni vos pueden borrarlas. Eliminar la cuenta no mueve fondos.',
+      'Tu cuenta en el supermercado (por ejemplo Día). Un turno de chat que todavía no se archivó vence solo, dentro de la hora. Los datos de Changuito que solo están en el navegador de otro dispositivo quedan ahí hasta que limpies ese navegador.',
+      'Copias que un tercero ya tiene bajo su propia política (el supermercado, el proveedor de IA, Privy o un proveedor de analítica). Borramos lo que guardamos nosotros. No controlamos sus sistemas.',
+    ],
+  },
+  {
+    id: 'time',
+    heading: '5. En cuánto tiempo',
+    paragraphs: [
+      'En la app, el borrado de la copia de Changuito corre cuando confirmás. Por correo, completamos un pedido que podemos asociar dentro de los 30 días.',
+    ],
+  },
+  { id: 'contact', heading: '6. Contacto', paragraphs: [`Escribinos a ${SUPPORT_EMAIL}.`] },
+];
+
 const DOCS: Record<LegalDoc, Record<LegalLang, { title: string; description: string; intro: string; sections: readonly LegalSection[] }>> = {
   terms: {
     en: {
@@ -452,6 +544,22 @@ const DOCS: Record<LegalDoc, Record<LegalLang, { title: string; description: str
       sections: PRIVACY_ES,
     },
   },
+  deletion: {
+    en: {
+      title: 'Delete your account and data',
+      description: 'How to ask Changuito to delete your account and the personal data we store, in the app or by email.',
+      intro:
+        'You can delete your Changuito account and the personal data we store for it. Do it in the app, or by email if you cannot sign in.',
+      sections: DELETE_EN,
+    },
+    es: {
+      title: 'Eliminar tu cuenta y tus datos',
+      description: 'Cómo pedirle a Changuito que borre tu cuenta y los datos personales que guardamos, en la app o por correo.',
+      intro:
+        'Podés eliminar tu cuenta de Changuito y los datos personales que guardamos. Hacelo en la app, o por correo si no podés entrar.',
+      sections: DELETE_ES,
+    },
+  },
 };
 
 export function legalCopy(doc: LegalDoc, lang: LegalLang): LegalCopy {
@@ -463,6 +571,7 @@ export function legalCopy(doc: LegalDoc, lang: LegalLang): LegalCopy {
     ...UI[lang],
     switchHref: LEGAL_PATHS[doc][other],
     switchLang: other,
+    updated: doc === 'deletion' ? DELETION_UPDATED : LEGAL_UPDATED,
   };
 }
 
@@ -471,3 +580,14 @@ export const LEGAL_FOOTER_LINKS = [
   { href: LEGAL_PATHS.terms.es, label: 'Términos', testId: 'landing-terms' },
   { href: LEGAL_PATHS.privacy.es, label: 'Privacidad', testId: 'landing-privacy' },
 ] as const;
+
+/** Separate from LEGAL_FOOTER_LINKS so the terms and privacy links stay a pair. */
+export const DELETION_FOOTER_LINKS = [
+  { href: LEGAL_PATHS.deletion.es, label: 'Eliminar cuenta', testId: 'landing-delete-account' },
+] as const;
+
+export const SUPPORT_FOOTER_LINK = {
+  href: `mailto:${SUPPORT_EMAIL}`,
+  label: SUPPORT_EMAIL,
+  testId: 'landing-support',
+} as const;
