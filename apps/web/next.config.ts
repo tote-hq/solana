@@ -34,7 +34,9 @@ const config: NextConfig = {
   // Bundling it is only safe because `@changuito/mcp/server` has no reference
   // to the checkout module — not even a dynamic one, which a bundler would
   // resolve at build time anyway. See packages/mcp/src/server.ts.
-  transpilePackages: ['@changuito/mcp'],
+  // `@changuito/trust` is TypeScript source (the shared support address) and
+  // is compiled with the app for the same reason.
+  transpilePackages: ['@changuito/mcp', '@changuito/trust'],
 
   outputFileTracingRoot: new URL('../..', import.meta.url).pathname,
 

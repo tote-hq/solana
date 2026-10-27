@@ -46,3 +46,12 @@ html:has([data-testid='whitelist-screen']) body {
     scroll-behavior: auto;
   }
 }
+
+/* Legal pages follow the system theme; the rest of the landing stays light. */
+@media (prefers-color-scheme: dark) {
+  html:has([data-legal]),
+  html:has([data-legal]) body {
+    color-scheme: dark;
+    background: #1c1310;
+  }
+}

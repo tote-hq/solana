@@ -1,3 +1,5 @@
+import { PUBLIC_LEGAL } from '@changuito/trust';
+
 import { BetaOnboarding } from '../components/BetaOnboarding';
 import { Chat } from '../components/Chat';
 import { Deck } from '../components/Deck';
@@ -59,6 +61,12 @@ export default async function Home() {
                   <span className="app-footer-copy">{COPYRIGHT_LINE}</span>
                   <a className="app-legal" href="/privacidad">
                     {inLang(lang, { es: 'Privacidad', en: 'Privacy' })}
+                  </a>
+                  <a className="app-legal" href={inLang(lang, PUBLIC_LEGAL.terms)}>
+                    {inLang(lang, { es: 'Términos', en: 'Terms' })}
+                  </a>
+                  <a className="app-legal" href={inLang(lang, PUBLIC_LEGAL.deletion)}>
+                    {inLang(lang, { es: 'Eliminar cuenta', en: 'Delete account' })}
                   </a>
                   <LangToggle />
                 </footer>
