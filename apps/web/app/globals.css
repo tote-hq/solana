@@ -172,6 +172,23 @@ a:hover { color: var(--chg-arcilla); }
   min-height: 40px;
   white-space: nowrap;
 }
+/* Android offers email, Google and the phone account. 44px meets the touch size. */
+.topbar-wallet.is-android {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.topbar-wallet.is-android .btn.topbar-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+@media (max-width: 720px) {
+  :root:has(.topbar-wallet.is-android) { --topbar-h: 120px; }
+  .topbar:has(.topbar-wallet.is-android) {
+    height: auto;
+    min-height: var(--topbar-h);
+    align-items: center;
+  }
+}
 .btn.topbar-btn:hover { background: rgba(42, 26, 20, 0.08); }
 .btn.topbar-btn:active { background: rgba(42, 26, 20, 0.14); }
 .topbar-btn:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
@@ -1166,7 +1183,7 @@ a:hover { color: var(--chg-arcilla); }
 
 .ck-login { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
 .ck-login-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; text-align: center; }
+.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; min-height: 44px; text-align: center; }
 
 .ck-frame {
   width: 100%;
@@ -1237,7 +1254,8 @@ a:hover { color: var(--chg-arcilla); }
 
 .pay-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
 .pay-warn { margin: 0; font-size: 13px; color: var(--warn); }
-.pay-error { margin: 0; font-size: 13px; color: var(--warn); word-break: break-word; }
+/* --warn (arcilla) is about 2.9:1 on white. Error text uses --warn-ink, which clears 4.5:1. */
+.pay-error { margin: 0; font-size: 13px; color: var(--warn-ink); word-break: break-word; }
 .pay-fine-line { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
 /* The dialog that hands out the shopper's own address. See ReceiveModal. */
 .receive-modal { max-width: 380px; }
@@ -1465,6 +1483,16 @@ a:hover { color: var(--chg-arcilla); }
   .app-footer {
     background: #fafaf7;
     color: #4a332c;
+  }
+  /* The shop stays on the light brand even when the OS is dark, so these
+     error surfaces keep the same ink on the same plate. */
+  .topbar-toast {
+    background: #ffffff;
+    color: #1a7f4b;
+  }
+  .topbar-toast.is-error,
+  .pay-error {
+    color: #7a2e12;
   }
 }
 

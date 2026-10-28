@@ -6,3 +6,10 @@
  * `wipeLocalAccount` drops every `changuito:` key, this one included.
  */
 export const MWA_ADDRESS_KEY = 'changuito:mwa-address';
+
+/**
+ * One-shot note written after a phone sign-out, read once on the next paint.
+ * `wipeLocalAccount` runs first, so this is set afterwards and survives the
+ * reload that sign-out uses to drop in-memory state.
+ */
+export const MWA_NOTICE_KEY = 'changuito:mwa-notice';

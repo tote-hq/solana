@@ -5,11 +5,12 @@ import { toSolanaWalletConnectors, useSignTransaction, useWallets } from '@privy
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { MWA_ADDRESS_KEY } from '../lib/mwa-key.ts';
-import { currentUserAgent, DEFAULT_PRIVY_LOGIN_METHODS, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
+import { currentUserAgent, DEFAULT_PRIVY_LOGIN_METHODS, isAndroidWalletClient, privyLoginMethods, type PrivyLoginMethod } from '../lib/privy-login.ts';
 import { linkedSolanaWallet, restoredWalletSelection, selectedSolanaWallet, WALLET_SELECTION_KEY, type WalletSelection } from '../lib/privy-wallet.ts';
 import { DEFAULT_RPC } from '../lib/solana.ts';
 import { WalletContext, type WalletState } from '../lib/use-wallet.ts';
+import { onChainSigner } from '../lib/wallet-runtime.ts';
+import { useMobileSession } from './mobile-session.tsx';
 
 const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
 const RPC = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_RPC;
@@ -20,16 +21,25 @@ const WS = RPC.replace(/^http/, 'ws');
  * login. The wallet only signs; the server pays the fee and sends (see
  * app/api/checkout/open).
  *
- * Google stays available inside the Seeker WebShell. The app keeps
- * accounts.google.com and auth.privy.io in the WebView and strips the
- * WebView user-agent tokens. See `privyLoginMethods`.
+ * This mounts in the browser and in the Seeker shell. Email and Google stay
+ * inside the WebView (the shell keeps those hosts and strips the WebView
+ * user-agent tokens). Android also connects the phone account through
+ * Mobile Wallet Adapter; once that account is the session, it signs escrow.
  *
- * A phone wallet (Mobile Wallet Adapter) is registered in the browser only,
- * and can sign in even when this build has no Privy app id. `registerMwa`
- * is loaded from a click or this effect so the server render never evaluates
- * a package that touches `window`.
+ * `registerMwa` is loaded from a click or this effect so the server render
+ * never evaluates a package that touches `window`.
  */
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+export function WalletProvider({
+  children,
+  androidWallet = false,
+}: {
+  children: React.ReactNode;
+  androidWallet?: boolean;
+}) {
+  const [androidChoices, setAndroidChoices] = useState(androidWallet);
+  useEffect(() => {
+    setAndroidChoices(androidWallet || isAndroidWalletClient(currentUserAgent()));
+  }, [androidWallet]);
   const loginMethods = useShellLoginMethods();
   const connectors = useMemo(() => toSolanaWalletConnectors({ shouldAutoConnect: false }), []);
   const rpcs = useMemo(
@@ -65,47 +75,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         externalWallets: { solana: { connectors } },
       }}
     >
-      <Bridge>{children}</Bridge>
+      <Bridge androidChoices={androidChoices}>{children}</Bridge>
     </PrivyProvider>
   );
-}
-
-function useMobileSession() {
-  const [mobileAddress, setMobileAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(MWA_ADDRESS_KEY);
-      if (saved) setMobileAddress(saved);
-    } catch {
-      /* private mode: the cookie, if any, is still httpOnly and unused here */
-    }
-  }, []);
-
-  const clearMobile = useCallback(() => {
-    setMobileAddress(null);
-    try {
-      sessionStorage.removeItem(MWA_ADDRESS_KEY);
-    } catch {
-      /* already gone */
-    }
-    void import('../lib/mobile-wallet-client.ts')
-      .then((m) => m.disconnectMobileWallet())
-      .catch(() => {});
-  }, []);
-
-  const loginMobile = useCallback(async () => {
-    const { signInWithMobileWallet } = await import('../lib/mobile-wallet-client.ts');
-    const address = await signInWithMobileWallet();
-    try {
-      sessionStorage.setItem(MWA_ADDRESS_KEY, address);
-    } catch {
-      /* the httpOnly cookie is the session; this key only restores the bar */
-    }
-    setMobileAddress(address);
-  }, []);
-
-  return { mobileAddress, loginMobile, clearMobile };
 }
 
 function MobileOnly({ children }: { children: React.ReactNode }) {
@@ -120,6 +92,7 @@ function MobileOnly({ children }: { children: React.ReactNode }) {
       enabled: false,
       ready: true,
       authenticated: Boolean(mobile.mobileAddress),
+      androidChoices: false,
       kind: mobile.mobileAddress ? 'mobile' : 'off',
       address: mobile.mobileAddress,
       email: null,
@@ -137,11 +110,12 @@ function MobileOnly({ children }: { children: React.ReactNode }) {
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }
 
-function Bridge({ children }: { children: React.ReactNode }) {
+function Bridge({ androidChoices, children }: { androidChoices: boolean; children: React.ReactNode }) {
   const { ready, authenticated, user, logout, getAccessToken } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const { signTransaction: privySign } = useSignTransaction();
-  const mobile = useMobileSession();
+  // Confirming the phone account must not sign an email session out.
+  const mobile = useMobileSession(androidChoices, androidChoices, true);
   const [selection, setSelection] = useState<WalletSelection | null>(null);
   const [restoredUser, setRestoredUser] = useState<string | null>(null);
   const [loginPending, setLoginPending] = useState(false);
@@ -177,7 +151,10 @@ function Bridge({ children }: { children: React.ReactNode }) {
 
   const signTransaction = useCallback(
     async (tx: Uint8Array) => {
-      if (mobile.mobileAddress) {
+      // On Android the phone account signs once it is the session, including
+      // after an email or Google login links it. A different key cannot sign
+      // a transaction built for the embedded wallet, so that path stays on Privy.
+      if (onChainSigner(Boolean(mobile.mobileAddress)) === 'mwa') {
         const { signMobileTransaction } = await import('../lib/mobile-wallet-client.ts');
         return signMobileTransaction(tx);
       }
@@ -191,17 +168,26 @@ function Bridge({ children }: { children: React.ReactNode }) {
   const value = useMemo<WalletState>(
     () => ({
       enabled: true,
-      ready: ready && !loginPending && (!authenticated || (walletsReady && restoredUser === user?.id)),
+      ready: ready && mobile.sessionReady && !loginPending && (!authenticated || (walletsReady && restoredUser === user?.id)),
       authenticated: Boolean(address),
+      androidChoices,
       kind: mobile.mobileAddress ? 'mobile' : address ? 'privy' : 'off',
       address,
       // A Google login has no `email` account, only `google.email`; both feed the avatar's initials.
       email: mobile.mobileAddress ? null : (user?.email?.address ?? user?.google?.email ?? null),
-      login: () => {
+      login: (method) => {
         mobile.clearMobile();
         setLoginPending(true);
         // Read the user agent at the click. The provider config above catches
         // up in an effect, and this override is what the modal actually shows.
+        if (method === 'email') {
+          login({ loginMethods: ['email'] });
+          return;
+        }
+        if (method === 'google') {
+          login({ loginMethods: ['google'] });
+          return;
+        }
         login({ loginMethods: privyLoginMethods(currentUserAgent()) });
       },
       loginMobile: mobile.loginMobile,
@@ -225,6 +211,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
       authenticated,
       address,
       mobile.mobileAddress,
+      mobile.sessionReady,
       mobile.clearMobile,
       mobile.loginMobile,
       user,
@@ -235,6 +222,7 @@ function Bridge({ children }: { children: React.ReactNode }) {
       restoredUser,
       loginPending,
       user?.id,
+      androidChoices,
     ],
   );
 

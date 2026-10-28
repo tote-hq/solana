@@ -8,6 +8,7 @@ import { usdcAmount } from '../lib/faucet-copy.ts';
 import { modeCopy, previewMasthead } from '../lib/mode-copy.ts';
 import { OPEN_FAUCET_EVENT } from '../lib/onboarding.ts';
 import { initials, profileCopy } from '../lib/profile-copy.ts';
+import { MWA_NOTICE_KEY } from '../lib/mwa-key.ts';
 import { ensureUserCookie, forgetUserCookie } from '../lib/session-login.ts';
 import { fetchAs } from '../lib/fetch-as.ts';
 import { wipeLocalAccount } from '../lib/local-account.ts';
@@ -43,6 +44,8 @@ export function WalletWidget() {
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const [receiving, setReceiving] = useState(false);
   const [showingProfile, setShowingProfile] = useState(false);
   const profileButton = useRef<HTMLButtonElement>(null);
@@ -55,6 +58,18 @@ export function WalletWidget() {
     const t = setTimeout(() => setNote(null), 6000);
     return () => clearTimeout(t);
   }, [note]);
+
+  // Sign-out reloads, so the sentence has to be written down first. Read once.
+  useEffect(() => {
+    if (!wallet.androidChoices || address) return;
+    try {
+      if (sessionStorage.getItem(MWA_NOTICE_KEY) !== 'signed-out') return;
+      sessionStorage.removeItem(MWA_NOTICE_KEY);
+    } catch {
+      return;
+    }
+    setSignedOut(true);
+  }, [wallet.androidChoices, address]);
 
   // The onboarding card's "faucet" link (BetaOnboarding.tsx) opens the same
   // confirm as the button below. It is only a link once signed in, and the
@@ -104,6 +119,13 @@ export function WalletWidget() {
     setShowingProfile(false);
     forgetUserCookie();
     wipeLocalAccount();
+    if (wallet.androidChoices) {
+      try {
+        sessionStorage.setItem(MWA_NOTICE_KEY, 'signed-out');
+      } catch {
+        /* the signed-out screen still offers Entrar */
+      }
+    }
     void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' })
       .catch(() => null)
       .then(() => wallet.logout())
@@ -116,6 +138,7 @@ export function WalletWidget() {
     track('payment_start', { flow: 'faucet' });
     setFunding(true);
     setNote(null);
+    setNoteError(false);
     try {
       await ensureUserCookie(address, wallet.accessToken);
       const res = await fetchAs({ address, sign: wallet.accessToken }, '/api/faucet', { method: 'POST' });
@@ -124,30 +147,84 @@ export function WalletWidget() {
       if (!res.ok && res.status !== 429) throw new Error(json.message ?? json.error ?? `faucet failed (${res.status})`);
       track('payment_success', { flow: 'faucet', code: res.status === 429 ? 'enough' : 'ok' });
       track('faucet', { code: res.status === 429 ? 'enough' : 'ok' });
+      setNoteError(false);
       setNote(json.note ?? copy.fundedAmount(usdcAmount(GRANT_UNITS, lang)));
       refresh();
     } catch (err) {
       track('payment_fail', { flow: 'faucet', code: 'error' });
       track('failure', { code: 'faucet' });
+      setNoteError(true);
       setNote(err instanceof Error ? err.message : String(err));
     } finally {
       setFunding(false);
     }
   }
 
+  function showFailure(err: unknown) {
+    setNoteError(true);
+    setNote(err instanceof Error ? err.message : String(err));
+  }
+
+  function connectPhone() {
+    setPhoneBusy(true);
+    setNote(null);
+    setNoteError(false);
+    setSignedOut(false);
+    trackLoginStart(() => {
+      void wallet.loginMobile().catch(showFailure).finally(() => setPhoneBusy(false));
+    });
+  }
+
   if (!address) {
+    const android = wallet.androidChoices && wallet.enabled;
     return (
       <div
-        className={wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
+        className={android ? 'topbar-wallet is-android' : wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
         title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md'}
       >
         <ModeBadge network="devnet" />
-        {wallet.enabled ? (
+        {android ? (
+          <span className="sr-only">{wallet.ready ? copy.androidLead : copy.verifying}</span>
+        ) : wallet.enabled ? (
           <span className="topbar-muted topbar-hint">{masthead.hint}</span>
         ) : (
           <span className="topbar-muted">{copy.unconfigured}</span>
         )}
-        {wallet.enabled ? (
+        {android ? (
+          <>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-email"
+              aria-label={copy.emailAria}
+              disabled={!wallet.ready}
+              onClick={() => trackLoginStart(() => wallet.login('email'))}
+            >
+              {copy.emailCta}
+            </button>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-google"
+              aria-label={copy.googleAria}
+              disabled={!wallet.ready}
+              onClick={() => trackLoginStart(() => wallet.login('google'))}
+            >
+              {copy.googleCta}
+            </button>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-native"
+              aria-label={copy.connectAria}
+              aria-busy={phoneBusy || !wallet.ready}
+              disabled={phoneBusy || !wallet.ready}
+              onClick={connectPhone}
+            >
+              {phoneBusy ? copy.nativeBusy : copy.connectCta}
+            </button>
+          </>
+        ) : wallet.enabled ? (
           <button
             type="button"
             className="btn topbar-btn"
@@ -157,19 +234,25 @@ export function WalletWidget() {
             {masthead.action}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="btn topbar-btn"
-          data-testid="wallet-mobile"
-          aria-label={copy.phoneAria}
-          disabled={phoneBusy}
-          onClick={() => { setPhoneBusy(true); void wallet.loginMobile().catch((err) => setNote(err instanceof Error ? err.message : String(err))).finally(() => setPhoneBusy(false)); }}
-        >
-          {copy.phoneCta}
-        </button>
+        {android ? null : (
+          <button
+            type="button"
+            className="btn topbar-btn"
+            data-testid="wallet-mobile"
+            aria-label={copy.phoneAria}
+            disabled={phoneBusy}
+            onClick={connectPhone}
+          >
+            {copy.phoneCta}
+          </button>
+        )}
         {note ? (
-          <p className="topbar-toast" role="status">
+          <p className={noteError ? 'topbar-toast is-error' : 'topbar-toast'} role={noteError ? 'alert' : 'status'}>
             {note}
+          </p>
+        ) : signedOut ? (
+          <p className="topbar-toast" role="status">
+            {copy.signedOut}
           </p>
         ) : null}
       </div>
@@ -178,6 +261,19 @@ export function WalletWidget() {
 
   return (
     <div className="topbar-wallet">
+      {wallet.androidChoices && wallet.kind === 'privy' ? (
+        <button
+          type="button"
+          className="btn topbar-btn"
+          data-testid="wallet-link"
+          aria-label={copy.linkAria}
+          aria-busy={phoneBusy}
+          disabled={phoneBusy || !wallet.ready}
+          onClick={connectPhone}
+        >
+          {phoneBusy ? copy.nativeBusy : copy.linkCta}
+        </button>
+      ) : null}
       <button
         ref={fundButton}
         type="button"
@@ -214,7 +310,7 @@ export function WalletWidget() {
       </button>
 
       {error || note ? (
-        <p className={error ? 'topbar-toast is-error' : 'topbar-toast'} role="status">
+        <p className={error || noteError ? 'topbar-toast is-error' : 'topbar-toast'} role={error || noteError ? 'alert' : 'status'}>
           {error ?? note}
         </p>
       ) : null}

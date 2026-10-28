@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { PUBLIC_LEGAL } from '@changuito/trust';
 
 import { BetaOnboarding } from '../components/BetaOnboarding';
@@ -14,6 +15,7 @@ import { COPYRIGHT_LINE } from '../lib/founder-trust-copy';
 import { turnstileSiteKey } from '../lib/human-gate';
 import { inLang } from '../lib/lang.ts';
 import { langFromCookie } from '../lib/lang-server.ts';
+import { isAndroidWalletClient } from '../lib/privy-login.ts';
 
 // The site key has to be read per request. A static prerender baked siteKey:""
 // and the widget never appeared, even after the env var existed at runtime.
@@ -25,6 +27,15 @@ export default async function Home() {
   // Read here rather than in a provider effect so the first HTML is already in
   // the shopper's language. See components/LangProvider.tsx.
   const lang = await langFromCookie();
+  // Android (Seeker shell or Play WebView) also offers the phone account.
+  // Privy still mounts: email and Google are read from this same request.
+  let userAgent: string | null = null;
+  try {
+    userAgent = (await headers()).get('user-agent');
+  } catch {
+    userAgent = null;
+  }
+  const androidWallet = isAndroidWalletClient(userAgent);
   return (
     // Outermost, above the network: every provider below draws words, and the
     // mode copy is one of the things that gets translated.
@@ -33,7 +44,7 @@ export default async function Home() {
           which key that provider is built with, so it has to be decided
           above it. */}
       <NetworkProvider>
-        <WalletProvider>
+        <WalletProvider androidWallet={androidWallet}>
           <ShopProvider>
             {/* Above the deck and outside it: the bar spans the window at
                 every width, including the three-column one. */}

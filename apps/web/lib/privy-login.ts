@@ -18,8 +18,40 @@ export const DEFAULT_PRIVY_LOGIN_METHODS = ['email', 'google', 'wallet'] as cons
 
 export type PrivyLoginMethod = (typeof DEFAULT_PRIVY_LOGIN_METHODS)[number];
 
-/** Appended by solana-mobile webshell's `appendUserAgentMarker`. */
+/**
+ * Appended by the Seeker shell (`appendUserAgentMarker` in `me.changuito.sol`).
+ * The same marker `@solana-mobile/wallet-standard-mobile` looks for
+ * (`isSolanaMobileWebShell`) so local association skips the browser permission
+ * prompt. It is the only signal that this document is inside that app: the
+ * shell strips `; wv` before the page loads, so a generic WebView token is
+ * neither necessary nor sufficient.
+ */
 export const SOLANA_MOBILE_WEB_SHELL_MARKER = 'Solana Mobile Web Shell';
+
+/**
+ * True only inside the Solana Mobile Web Shell.
+ *
+ * Null and empty are false, so a missing `User-Agent` matches the first
+ * client render. Privy still loads in the shell: email and Google stay,
+ * and this marker only tells the page that Mobile Wallet Adapter can
+ * reach the phone's account without the browser permission prompt.
+ */
+export function isSolanaMobileWebShell(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  return userAgent.includes(SOLANA_MOBILE_WEB_SHELL_MARKER);
+}
+
+/**
+ * Android, including the Seeker shell and a Play WebView.
+ *
+ * The shell strips `; wv`, so the marker is checked on its own. Chrome on
+ * Android still contains `Android`. Desktop and iOS stay false.
+ */
+export function isAndroidWalletClient(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  if (isSolanaMobileWebShell(userAgent)) return true;
+  return /Android/i.test(userAgent);
+}
 
 /**
  * Android WebView, including the Seeker APK (`me.changuito.sol`).

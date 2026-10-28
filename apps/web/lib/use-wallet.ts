@@ -13,11 +13,16 @@ import { createContext, useContext } from 'react';
  * fact. A context default is the cheapest way to keep hook order fixed.
  */
 export interface WalletState {
-  /** This build has a Privy app id at all. */
+  /** Sign-in can happen: Privy is configured, or this is the phone-only shell. */
   enabled: boolean;
-  /** Privy finished restoring its session. Before this, a Privy `address` means nothing. */
+  /** Privy finished restoring its session, or the phone session check finished. */
   ready: boolean;
   authenticated: boolean;
+  /**
+   * Android, including the Seeker shell. Email, Google and the phone
+   * account are all offered. Privy stays mounted.
+   */
+  androidChoices: boolean;
   /**
    * `privy` is an embedded or linked external wallet authenticated by Privy. `mobile` is a phone wallet that signed
    * the server's message. `off` is signed out. When both exist, `mobile` wins
@@ -27,7 +32,8 @@ export interface WalletState {
   /** The Solana address, base58. Case-sensitive: never upper-case it. */
   address: string | null;
   email: string | null;
-  login: () => void;
+  /** Opens Privy. `email` or `google` limits the modal to that one method. */
+  login: (method?: 'email' | 'google') => void;
   /** Connect a phone wallet, sign the server challenge, and keep that address. */
   loginMobile: () => Promise<void>;
   logout: () => Promise<void>;
@@ -49,6 +55,7 @@ export const WALLET_OFF: WalletState = {
   enabled: false,
   ready: true,
   authenticated: false,
+  androidChoices: false,
   kind: 'off',
   address: null,
   email: null,

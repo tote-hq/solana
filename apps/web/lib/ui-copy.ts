@@ -92,6 +92,22 @@ export interface WalletCopy {
   phoneCta: string;
   /** Spoken name: which account the button signs in. */
   phoneAria: string;
+  /** While the phone account sheet is open. */
+  nativeBusy: string;
+  /** Android: one sentence for the three ways in. Read, not always shown. */
+  androidLead: string;
+  emailCta: string;
+  emailAria: string;
+  googleCta: string;
+  googleAria: string;
+  /** Visible label on the phone-account button. English says "Connect wallet". */
+  connectCta: string;
+  connectAria: string;
+  /** Shown once an email or Google session can still attach the phone account. */
+  linkCta: string;
+  linkAria: string;
+  /** After Salir, until the next attempt. */
+  signedOut: string;
 }
 
 export interface PaymentCopy {
@@ -303,6 +319,17 @@ const ES: UiCopy = {
     signOutAria: 'Salir',
     phoneCta: 'Teléfono',
     phoneAria: 'Entrar con la cuenta de este teléfono',
+    nativeBusy: 'Entrando…',
+    androidLead: 'Entrá con email, con Google, o con la cuenta de este teléfono.',
+    emailCta: 'Email',
+    emailAria: 'Continuar con email',
+    googleCta: 'Google',
+    googleAria: 'Continuar con Google',
+    connectCta: 'Conectar cuenta',
+    connectAria: 'Conectar cuenta de este teléfono',
+    linkCta: 'Conectar cuenta',
+    linkAria: 'Conectar cuenta de este teléfono para firmar',
+    signedOut: 'Saliste. Cuando quieras, volvé a entrar.',
   },
   payment: {
     aria: 'Confirmar el pago',
@@ -503,6 +530,17 @@ const EN: UiCopy = {
     signOutAria: 'Sign out',
     phoneCta: 'Phone',
     phoneAria: 'Sign in with the account on this phone',
+    nativeBusy: 'Signing in…',
+    androidLead: 'Continue with email, with Google, or with the account on this phone.',
+    emailCta: 'Email',
+    emailAria: 'Continue with email',
+    googleCta: 'Google',
+    googleAria: 'Continue with Google',
+    connectCta: 'Connect wallet',
+    connectAria: 'Connect wallet on this phone',
+    linkCta: 'Connect wallet',
+    linkAria: 'Connect wallet on this phone to sign',
+    signedOut: 'You signed out. You can sign in again whenever you want.',
   },
   payment: {
     aria: 'Confirm the payment',

@@ -15,6 +15,7 @@ import { fetchAs } from '../lib/fetch-as.ts';
 import { ensureUserCookie } from '../lib/session-login';
 import { explorerTx } from '../lib/solana.ts';
 import { useBalances } from '../lib/use-balances.ts';
+import { uiCopy } from '../lib/ui-copy.ts';
 import { useWallet } from '../lib/use-wallet.ts';
 import { useLang } from './LangProvider';
 import { PasswordInput } from './PasswordInput';
@@ -25,7 +26,7 @@ import { flowLabels, flowRailIndex, flowScreen } from '../lib/checkout/flow.ts';
 /**
  * From a full basket to a settled escrow, in four steps:
  *
- *   1. login   — email through Privy; the embedded Solana wallet comes with it.
+ *   1. login   — email through Privy, or the phone account inside the Seeker shell.
  *   2. lock    — the server quotes goods + envío at belo's USDC rate (order
  *                id, basket hash, USDC amount) and the shopper confirms that
  *                breakdown and types their Día login. The server builds
@@ -106,6 +107,7 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [savingDia, setSavingDia] = useState(false);
+  const [nativeBusy, setNativeBusy] = useState(false);
   const quoting = useRef(false);
   const alerted = useRef<string | null>(null);
   const field = (k: keyof DiaLogin) => (e: ChangeEvent<HTMLInputElement>) => setDia((d) => ({ ...d, [k]: e.target.value }));
@@ -396,11 +398,62 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
 
           {step === 'login' ? (
             <div className="ck-login" data-testid="checkout-login-step">
-              <p className="ck-lead">{copy.loginLead}</p>
+              <p id="checkout-login-lead" className="ck-lead">
+                {wallet.androidChoices ? uiCopy(lang).wallet.androidLead : copy.loginLead}
+              </p>
               <div className="ck-login-actions">
-                <button type="button" className="btn" onClick={() => wallet.login()} disabled={!wallet.enabled || !wallet.ready}>
-                  {copy.loginCta}
-                </button>
+                {wallet.androidChoices ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-email"
+                      aria-describedby="checkout-login-lead"
+                      disabled={!wallet.enabled || !wallet.ready}
+                      onClick={() => wallet.login('email')}
+                    >
+                      {uiCopy(lang).wallet.emailAria}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-google"
+                      aria-describedby="checkout-login-lead"
+                      disabled={!wallet.enabled || !wallet.ready}
+                      onClick={() => wallet.login('google')}
+                    >
+                      {uiCopy(lang).wallet.googleAria}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-native-login"
+                      aria-describedby="checkout-login-lead"
+                      aria-busy={nativeBusy}
+                      disabled={!wallet.enabled || !wallet.ready || nativeBusy}
+                      onClick={() => {
+                        setNativeBusy(true);
+                        setError(null);
+                        void wallet.loginMobile()
+                          .catch((err) => setError(err instanceof Error ? err.message : copy.failed))
+                          .finally(() => setNativeBusy(false));
+                      }}
+                    >
+                      {nativeBusy ? uiCopy(lang).wallet.nativeBusy : uiCopy(lang).wallet.connectAria}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    data-testid="checkout-login"
+                    aria-describedby="checkout-login-lead"
+                    disabled={!wallet.enabled || !wallet.ready}
+                    onClick={() => wallet.login()}
+                  >
+                    {copy.loginCta}
+                  </button>
+                )}
               </div>
             </div>
           ) : null}
