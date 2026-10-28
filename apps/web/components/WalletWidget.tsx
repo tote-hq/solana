@@ -61,7 +61,7 @@ export function WalletWidget() {
 
   // Sign-out reloads, so the sentence has to be written down first. Read once.
   useEffect(() => {
-    if (!wallet.nativeOnly || address) return;
+    if (!wallet.androidChoices || address) return;
     try {
       if (sessionStorage.getItem(MWA_NOTICE_KEY) !== 'signed-out') return;
       sessionStorage.removeItem(MWA_NOTICE_KEY);
@@ -69,7 +69,7 @@ export function WalletWidget() {
       return;
     }
     setSignedOut(true);
-  }, [wallet.nativeOnly, address]);
+  }, [wallet.androidChoices, address]);
 
   // The onboarding card's "faucet" link (BetaOnboarding.tsx) opens the same
   // confirm as the button below. It is only a link once signed in, and the
@@ -119,7 +119,7 @@ export function WalletWidget() {
     setShowingProfile(false);
     forgetUserCookie();
     wipeLocalAccount();
-    if (wallet.nativeOnly) {
+    if (wallet.androidChoices) {
       try {
         sessionStorage.setItem(MWA_NOTICE_KEY, 'signed-out');
       } catch {
@@ -165,44 +165,65 @@ export function WalletWidget() {
     setNote(err instanceof Error ? err.message : String(err));
   }
 
+  function connectPhone() {
+    setPhoneBusy(true);
+    setNote(null);
+    setNoteError(false);
+    setSignedOut(false);
+    trackLoginStart(() => {
+      void wallet.loginMobile().catch(showFailure).finally(() => setPhoneBusy(false));
+    });
+  }
+
   if (!address) {
-    const shell = wallet.nativeOnly;
+    const android = wallet.androidChoices && wallet.enabled;
     return (
       <div
-        className={shell ? 'topbar-wallet is-native' : wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
-        title={wallet.enabled || shell ? undefined : 'Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md'}
+        className={android ? 'topbar-wallet is-android' : wallet.enabled ? 'topbar-wallet' : 'topbar-wallet wallet-off'}
+        title={wallet.enabled ? undefined : 'Falta NEXT_PUBLIC_PRIVY_APP_ID. Ver DEPLOY.md'}
       >
         <ModeBadge network="devnet" />
-        {shell ? (
-          <>
-            <span className="topbar-muted topbar-hint">{wallet.ready ? copy.nativeHint : copy.verifying}</span>
-            {wallet.ready ? null : <span className="sr-only">{copy.verifying}</span>}
-          </>
+        {android ? (
+          <span className="sr-only">{wallet.ready ? copy.androidLead : copy.verifying}</span>
         ) : wallet.enabled ? (
           <span className="topbar-muted topbar-hint">{masthead.hint}</span>
         ) : (
           <span className="topbar-muted">{copy.unconfigured}</span>
         )}
-        {shell ? (
-          <button
-            type="button"
-            className="btn topbar-btn"
-            data-testid="wallet-native"
-            aria-label={copy.nativeAria}
-            aria-busy={phoneBusy || !wallet.ready}
-            disabled={phoneBusy || !wallet.ready}
-            onClick={() => {
-              setPhoneBusy(true);
-              setNote(null);
-              setNoteError(false);
-              setSignedOut(false);
-              trackLoginStart(() => {
-                void wallet.loginMobile().catch(showFailure).finally(() => setPhoneBusy(false));
-              });
-            }}
-          >
-            {phoneBusy ? copy.nativeBusy : copy.nativeCta}
-          </button>
+        {android ? (
+          <>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-email"
+              aria-label={copy.emailAria}
+              disabled={!wallet.ready}
+              onClick={() => trackLoginStart(() => wallet.login('email'))}
+            >
+              {copy.emailCta}
+            </button>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-google"
+              aria-label={copy.googleAria}
+              disabled={!wallet.ready}
+              onClick={() => trackLoginStart(() => wallet.login('google'))}
+            >
+              {copy.googleCta}
+            </button>
+            <button
+              type="button"
+              className="btn topbar-btn"
+              data-testid="wallet-native"
+              aria-label={copy.connectAria}
+              aria-busy={phoneBusy || !wallet.ready}
+              disabled={phoneBusy || !wallet.ready}
+              onClick={connectPhone}
+            >
+              {phoneBusy ? copy.nativeBusy : copy.connectCta}
+            </button>
+          </>
         ) : wallet.enabled ? (
           <button
             type="button"
@@ -213,19 +234,14 @@ export function WalletWidget() {
             {masthead.action}
           </button>
         ) : null}
-        {shell ? null : (
+        {android ? null : (
           <button
             type="button"
             className="btn topbar-btn"
             data-testid="wallet-mobile"
             aria-label={copy.phoneAria}
             disabled={phoneBusy}
-            onClick={() => {
-              setPhoneBusy(true);
-              setNote(null);
-              setNoteError(false);
-              void wallet.loginMobile().catch(showFailure).finally(() => setPhoneBusy(false));
-            }}
+            onClick={connectPhone}
           >
             {copy.phoneCta}
           </button>
@@ -236,7 +252,7 @@ export function WalletWidget() {
           </p>
         ) : signedOut ? (
           <p className="topbar-toast" role="status">
-            {copy.nativeSignedOut}
+            {copy.signedOut}
           </p>
         ) : null}
       </div>
@@ -245,6 +261,19 @@ export function WalletWidget() {
 
   return (
     <div className="topbar-wallet">
+      {wallet.androidChoices && wallet.kind === 'privy' ? (
+        <button
+          type="button"
+          className="btn topbar-btn"
+          data-testid="wallet-link"
+          aria-label={copy.linkAria}
+          aria-busy={phoneBusy}
+          disabled={phoneBusy || !wallet.ready}
+          onClick={connectPhone}
+        >
+          {phoneBusy ? copy.nativeBusy : copy.linkCta}
+        </button>
+      ) : null}
       <button
         ref={fundButton}
         type="button"

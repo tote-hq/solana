@@ -45,14 +45,15 @@ function clearStored(): void {
 }
 
 /**
- * Phone-account session shared by the browser fallback and the Seeker shell.
+ * Phone-account session beside Privy.
  *
  * `durable` also writes localStorage, which survives the WebView process
  * the shell kills between opens. `confirmSession` asks `/api/session`
- * before the bar says anyone is signed in, so a cookie from an email
- * login is not drawn as the phone account.
+ * before the bar says the phone account is signed in, so an email login
+ * is not drawn as that account. `keepForeignSession` leaves that email
+ * cookie in place.
  */
-export function useMobileSession(durable = false, confirmSession = false) {
+export function useMobileSession(durable = false, confirmSession = false, keepForeignSession = false) {
   const [mobileAddress, setMobileAddress] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(!confirmSession);
 
@@ -80,7 +81,12 @@ export function useMobileSession(durable = false, confirmSession = false) {
         serverKnown = false;
       }
       if (cancelled) return;
-      const decision = restoreMobileSession({ storedAddress: stored, serverAddress, serverKnown });
+      const decision = restoreMobileSession({
+        storedAddress: stored,
+        serverAddress,
+        serverKnown,
+        keepForeignSession,
+      });
       if (decision.clearStored) clearStored();
       if (decision.clearCookie) {
         void fetch('/api/session/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
@@ -92,7 +98,7 @@ export function useMobileSession(durable = false, confirmSession = false) {
     return () => {
       cancelled = true;
     };
-  }, [confirmSession, durable]);
+  }, [confirmSession, durable, keepForeignSession]);
 
   const clearMobile = useCallback(() => {
     setMobileAddress(null);

@@ -19,10 +19,10 @@ export interface WalletState {
   ready: boolean;
   authenticated: boolean;
   /**
-   * The Seeker shell. Sign-in, disconnect and escrow signatures go through
-   * the phone account only. Privy is not mounted.
+   * Android, including the Seeker shell. Email, Google and the phone
+   * account are all offered. Privy stays mounted.
    */
-  nativeOnly: boolean;
+  androidChoices: boolean;
   /**
    * `privy` is an embedded or linked external wallet authenticated by Privy. `mobile` is a phone wallet that signed
    * the server's message. `off` is signed out. When both exist, `mobile` wins
@@ -32,7 +32,8 @@ export interface WalletState {
   /** The Solana address, base58. Case-sensitive: never upper-case it. */
   address: string | null;
   email: string | null;
-  login: () => void;
+  /** Opens Privy. `email` or `google` limits the modal to that one method. */
+  login: (method?: 'email' | 'google') => void;
   /** Connect a phone wallet, sign the server challenge, and keep that address. */
   loginMobile: () => Promise<void>;
   logout: () => Promise<void>;
@@ -54,7 +55,7 @@ export const WALLET_OFF: WalletState = {
   enabled: false,
   ready: true,
   authenticated: false,
-  nativeOnly: false,
+  androidChoices: false,
   kind: 'off',
   address: null,
   email: null,

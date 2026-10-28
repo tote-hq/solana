@@ -29,6 +29,12 @@ export function restoreMobileSession(input: {
   serverAddress: string | null;
   /** False when the session request never answered. The stored address stands. */
   serverKnown: boolean;
+  /**
+   * An email or Google session must survive. The phone account is shown
+   * only when the cookie is that same account; a different cookie is left
+   * in place.
+   */
+  keepForeignSession?: boolean;
 }): MobileSessionRestore {
   const stored = addressOf(input.storedAddress);
   const server = addressOf(input.serverAddress);
@@ -39,7 +45,11 @@ export function restoreMobileSession(input: {
     return { address: stored, clearStored: false, clearCookie: false };
   }
   if (server && stored !== server) {
-    return { address: null, clearStored: Boolean(stored), clearCookie: true };
+    return {
+      address: null,
+      clearStored: Boolean(stored),
+      clearCookie: !input.keepForeignSession,
+    };
   }
   return { address: null, clearStored: Boolean(stored), clearCookie: false };
 }

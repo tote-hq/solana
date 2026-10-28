@@ -172,10 +172,22 @@ a:hover { color: var(--chg-arcilla); }
   min-height: 40px;
   white-space: nowrap;
 }
-/* Seeker sign-in is the only control on that bar. 44px meets the touch size. */
-.topbar-wallet.is-native .btn.topbar-btn {
+/* Android offers email, Google and the phone account. 44px meets the touch size. */
+.topbar-wallet.is-android {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.topbar-wallet.is-android .btn.topbar-btn {
   min-height: 44px;
   min-width: 44px;
+}
+@media (max-width: 720px) {
+  :root:has(.topbar-wallet.is-android) { --topbar-h: 120px; }
+  .topbar:has(.topbar-wallet.is-android) {
+    height: auto;
+    min-height: var(--topbar-h);
+    align-items: center;
+  }
 }
 .btn.topbar-btn:hover { background: rgba(42, 26, 20, 0.08); }
 .btn.topbar-btn:active { background: rgba(42, 26, 20, 0.14); }
@@ -1171,7 +1183,7 @@ a:hover { color: var(--chg-arcilla); }
 
 .ck-login { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
 .ck-login-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; text-align: center; }
+.ck-login-actions .btn { flex: 1 1 auto; min-width: 140px; min-height: 44px; text-align: center; }
 
 .ck-frame {
   width: 100%;

@@ -7,9 +7,9 @@ import {
   mobileWalletFailureMessage,
 } from '../mobile-wallet-errors.ts';
 import { restoreMobileSession } from '../mobile-session-restore.ts';
-import { isSolanaMobileWebShell, SOLANA_MOBILE_WEB_SHELL_MARKER } from '../privy-login.ts';
+import { isAndroidWalletClient, isSolanaMobileWebShell, SOLANA_MOBILE_WEB_SHELL_MARKER } from '../privy-login.ts';
 import { uiCopy } from '../ui-copy.ts';
-import { selectWalletRuntime } from '../wallet-runtime.ts';
+import { onChainSigner, selectWalletRuntime } from '../wallet-runtime.ts';
 
 const DESKTOP =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -43,50 +43,58 @@ describe('Seeker shell detection', () => {
   });
 });
 
-describe('wallet runtime', () => {
-  it('uses the phone account inside the shell even when Privy is configured', () => {
-    assert.equal(selectWalletRuntime(SEEKER_SHELL, APP), 'seeker-native');
-    assert.equal(selectWalletRuntime(SEEKER_SHELL, ''), 'seeker-native');
-    assert.equal(selectWalletRuntime(SEEKER_SHELL, null), 'seeker-native');
-  });
-
-  it('keeps Privy in every other browser, including a generic Android WebView', () => {
-    for (const ua of [DESKTOP, ANDROID_CHROME, ANDROID_WEBVIEW, '', null, undefined]) {
-      assert.equal(selectWalletRuntime(ua, APP), 'privy', String(ua));
+describe('Android wallet client', () => {
+  it('treats the shell and any Android browser as able to use the phone account', () => {
+    for (const ua of [SEEKER_SHELL, ANDROID_CHROME, ANDROID_WEBVIEW]) {
+      assert.equal(isAndroidWalletClient(ua), true, ua);
     }
-  });
-
-  it('keeps the unconfigured phone fallback when there is no Privy app id', () => {
-    assert.equal(selectWalletRuntime(DESKTOP, ''), 'unconfigured');
-    assert.equal(selectWalletRuntime(DESKTOP, '   '), 'unconfigured');
-    assert.equal(selectWalletRuntime(ANDROID_WEBVIEW, null), 'unconfigured');
+    for (const ua of ['', DESKTOP, 'Node.js/22', null, undefined]) {
+      assert.equal(isAndroidWalletClient(ua), false, String(ua));
+    }
   });
 });
 
-describe('provider switch', () => {
-  const gate = source('../../components/WalletGate.tsx');
-  const page = source('../../app/page.tsx');
-  const provider = source('../../components/WalletProvider.tsx');
-  const native = source('../../components/native-wallet.tsx');
-
-  it('decides from the request user agent before the first paint', () => {
-    assert.match(page, /headers\(\)/);
-    assert.match(page, /user-agent/);
-    assert.match(page, /isSolanaMobileWebShell\(userAgent\)/);
-    assert.match(page, /<WalletGate nativeWalletOnly=\{nativeWalletOnly\}>/);
-    assert.doesNotMatch(page, /<WalletProvider/);
+describe('wallet runtime', () => {
+  it('keeps Privy on the shell and on Android, and adds the phone account', () => {
+    assert.equal(selectWalletRuntime(SEEKER_SHELL, APP), 'privy-and-mwa');
+    assert.equal(selectWalletRuntime(ANDROID_CHROME, APP), 'privy-and-mwa');
+    assert.equal(selectWalletRuntime(ANDROID_WEBVIEW, APP), 'privy-and-mwa');
   });
 
-  it('imports Privy only after the client agrees this is not the shell', () => {
-    assert.match(gate, /isSolanaMobileWebShell\(currentUserAgent\(\)\)/);
-    assert.match(gate, /if \(onShell\) return;/);
-    assert.match(gate, /import\('\.\/WalletProvider'\)/);
-    assert.doesNotMatch(gate, /@privy-io/);
-    assert.doesNotMatch(gate, /import\s*\{[^}]*\bWalletProvider\b[^}]*\}\s*from/);
-    assert.match(native, /nativeOnly: true/);
-    assert.doesNotMatch(native, /@privy-io/);
+  it('keeps Privy alone on a desktop browser', () => {
+    assert.equal(selectWalletRuntime(DESKTOP, APP), 'privy');
+    assert.equal(selectWalletRuntime('', APP), 'privy');
+    assert.equal(selectWalletRuntime(null, APP), 'privy');
+  });
+
+  it('keeps the unconfigured phone fallback when there is no Privy app id', () => {
+    assert.equal(selectWalletRuntime(SEEKER_SHELL, ''), 'unconfigured');
+    assert.equal(selectWalletRuntime(DESKTOP, '   '), 'unconfigured');
+    assert.equal(selectWalletRuntime(ANDROID_WEBVIEW, null), 'unconfigured');
+  });
+
+  it('signs with the phone account only once that account is the session', () => {
+    assert.equal(onChainSigner(true), 'mwa');
+    assert.equal(onChainSigner(false), 'privy');
+  });
+});
+
+describe('provider', () => {
+  const page = source('../../app/page.tsx');
+  const provider = source('../../components/WalletProvider.tsx');
+
+  it('always mounts Privy, and tells it when the request is Android', () => {
+    assert.match(page, /headers\(\)/);
+    assert.match(page, /user-agent/);
+    assert.match(page, /isAndroidWalletClient\(userAgent\)/);
+    assert.match(page, /<WalletProvider androidWallet=\{androidWallet\}>/);
+    assert.match(provider, /from '@privy-io\/react-auth'/);
     assert.match(provider, /loginMethods,/);
     assert.match(provider, /login\(\{ loginMethods: privyLoginMethods\(currentUserAgent\(\)\) \}\)/);
+    assert.match(provider, /loginMethods: \['email'\]/);
+    assert.match(provider, /loginMethods: \['google'\]/);
+    assert.match(provider, /onChainSigner\(Boolean\(mobile\.mobileAddress\)\) === 'mwa'/);
+    assert.doesNotMatch(page, /nativeWalletOnly/);
   });
 });
 
@@ -142,6 +150,14 @@ describe('reopen and disconnect', () => {
     );
   });
 
+  it('leaves an email session in place when the phone account is not that session', () => {
+    const other = '4Nd1mB4sK3y1111111111111111111111111111111';
+    assert.deepEqual(
+      restoreMobileSession({ storedAddress: ADDRESS, serverAddress: other, serverKnown: true, keepForeignSession: true }),
+      { address: null, clearStored: true, clearCookie: false },
+    );
+  });
+
   it('clears a stored account whose session has ended', () => {
     assert.deepEqual(
       restoreMobileSession({ storedAddress: ADDRESS, serverAddress: null, serverKnown: true }),
@@ -164,34 +180,45 @@ describe('reopen and disconnect', () => {
   });
 });
 
-describe('Seeker copy', () => {
-  it('has a sign-in, a rejection is not its job, and both languages differ', () => {
+describe('Android sign-in copy', () => {
+  it('offers email, Google and the phone account in both languages', () => {
     const es = uiCopy('es').wallet;
     const en = uiCopy('en').wallet;
-    assert.equal(es.nativeCta, 'Entrar');
-    assert.equal(en.nativeCta, 'Sign in');
-    assert.match(es.nativeSignedOut, /Saliste/);
-    assert.match(es.nativeLoginLead, /teléfono/);
-    assert.match(en.nativeAria, /this phone/);
-    assert.notEqual(es.nativeSignedOut, en.nativeSignedOut);
-    const forbidden = /\b(wallet|billetera|privy|escrow)\b/i;
-    for (const text of [es.nativeHint, es.nativeCta, es.nativeAria, es.nativeBusy, es.nativeSignedOut, es.nativeLoginLead, es.nativeLoginCta]) {
+    assert.equal(es.emailCta, 'Email');
+    assert.equal(es.googleCta, 'Google');
+    assert.equal(en.connectCta, 'Connect wallet');
+    assert.match(es.connectAria, /Conectar cuenta/);
+    assert.match(es.emailAria, /email/);
+    assert.match(es.googleAria, /Google/);
+    assert.match(es.signedOut, /Saliste/);
+    assert.match(es.androidLead, /teléfono/);
+    assert.notEqual(es.signedOut, en.signedOut);
+    const forbidden = /\b(billetera|privy|escrow)\b/i;
+    for (const text of [es.androidLead, es.emailAria, es.googleAria, es.connectCta, es.connectAria, es.linkAria, es.signedOut, es.nativeBusy]) {
       assert.doesNotMatch(text, forbidden, text);
     }
   });
 
-  it('the shell button is named, focusable copy lives in the widget, and the touch size is 44px', () => {
+  it('names the three buttons, keeps a 44px target, and describes checkout errors', () => {
     const widget = source('../../components/WalletWidget.tsx');
     const css = source('../../app/globals.css');
     const checkout = source('../../components/CheckoutModal.tsx');
+    assert.match(widget, /data-testid="wallet-email"/);
+    assert.match(widget, /data-testid="wallet-google"/);
     assert.match(widget, /data-testid="wallet-native"/);
-    assert.match(widget, /aria-label=\{copy\.nativeAria\}/);
+    assert.match(widget, /data-testid="wallet-link"/);
+    assert.match(widget, /aria-label=\{copy\.emailAria\}/);
+    assert.match(widget, /aria-label=\{copy\.googleAria\}/);
+    assert.match(widget, /aria-label=\{copy\.connectAria\}/);
     assert.match(widget, /role=\{noteError \? 'alert' : 'status'\}/);
-    assert.match(widget, /MWA_NOTICE_KEY/);
-    assert.match(css, /\.topbar-wallet\.is-native \.btn\.topbar-btn \{\s*min-height: 44px;/);
+    assert.match(css, /\.topbar-wallet\.is-android \.btn\.topbar-btn \{\s*min-height: 44px;/);
     assert.match(css, /\.pay-error \{[^}]*color: var\(--warn-ink\)/);
-    assert.match(checkout, /data-testid=\{wallet\.nativeOnly \? 'checkout-native-login' : 'checkout-login'\}/);
+    assert.match(checkout, /data-testid="checkout-email"/);
+    assert.match(checkout, /data-testid="checkout-google"/);
+    assert.match(checkout, /data-testid="checkout-native-login"/);
     assert.match(checkout, /aria-describedby="checkout-login-lead"/);
+    assert.match(checkout, /wallet\.login\('email'\)/);
+    assert.match(checkout, /wallet\.login\('google'\)/);
     assert.match(checkout, /wallet\.loginMobile\(\)/);
   });
 });

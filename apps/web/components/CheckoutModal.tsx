@@ -399,33 +399,61 @@ export function CheckoutModal({ cart, location, handoffUrl, onClose, onPaid }: P
           {step === 'login' ? (
             <div className="ck-login" data-testid="checkout-login-step">
               <p id="checkout-login-lead" className="ck-lead">
-                {wallet.nativeOnly ? uiCopy(lang).wallet.nativeLoginLead : copy.loginLead}
+                {wallet.androidChoices ? uiCopy(lang).wallet.androidLead : copy.loginLead}
               </p>
               <div className="ck-login-actions">
-                <button
-                  type="button"
-                  className="btn"
-                  data-testid={wallet.nativeOnly ? 'checkout-native-login' : 'checkout-login'}
-                  aria-describedby="checkout-login-lead"
-                  disabled={!wallet.enabled || !wallet.ready || nativeBusy}
-                  onClick={() => {
-                    if (!wallet.nativeOnly) {
-                      wallet.login();
-                      return;
-                    }
-                    setNativeBusy(true);
-                    setError(null);
-                    void wallet.loginMobile()
-                      .catch((err) => setError(err instanceof Error ? err.message : copy.failed))
-                      .finally(() => setNativeBusy(false));
-                  }}
-                >
-                  {wallet.nativeOnly
-                    ? nativeBusy
-                      ? uiCopy(lang).wallet.nativeBusy
-                      : uiCopy(lang).wallet.nativeLoginCta
-                    : copy.loginCta}
-                </button>
+                {wallet.androidChoices ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-email"
+                      aria-describedby="checkout-login-lead"
+                      disabled={!wallet.enabled || !wallet.ready}
+                      onClick={() => wallet.login('email')}
+                    >
+                      {uiCopy(lang).wallet.emailAria}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-google"
+                      aria-describedby="checkout-login-lead"
+                      disabled={!wallet.enabled || !wallet.ready}
+                      onClick={() => wallet.login('google')}
+                    >
+                      {uiCopy(lang).wallet.googleAria}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      data-testid="checkout-native-login"
+                      aria-describedby="checkout-login-lead"
+                      aria-busy={nativeBusy}
+                      disabled={!wallet.enabled || !wallet.ready || nativeBusy}
+                      onClick={() => {
+                        setNativeBusy(true);
+                        setError(null);
+                        void wallet.loginMobile()
+                          .catch((err) => setError(err instanceof Error ? err.message : copy.failed))
+                          .finally(() => setNativeBusy(false));
+                      }}
+                    >
+                      {nativeBusy ? uiCopy(lang).wallet.nativeBusy : uiCopy(lang).wallet.connectAria}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    data-testid="checkout-login"
+                    aria-describedby="checkout-login-lead"
+                    disabled={!wallet.enabled || !wallet.ready}
+                    onClick={() => wallet.login()}
+                  >
+                    {copy.loginCta}
+                  </button>
+                )}
               </div>
             </div>
           ) : null}

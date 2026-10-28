@@ -31,14 +31,26 @@ export const SOLANA_MOBILE_WEB_SHELL_MARKER = 'Solana Mobile Web Shell';
 /**
  * True only inside the Solana Mobile Web Shell.
  *
- * A normal browser, including Chrome on a Seeker and any other Android
- * WebView, stays false so Privy keeps loading there. Null and empty are
- * false: the server can call this with a missing `User-Agent` and the
- * answer matches the first client render.
+ * Null and empty are false, so a missing `User-Agent` matches the first
+ * client render. Privy still loads in the shell: email and Google stay,
+ * and this marker only tells the page that Mobile Wallet Adapter can
+ * reach the phone's account without the browser permission prompt.
  */
 export function isSolanaMobileWebShell(userAgent: string | null | undefined): boolean {
   if (!userAgent) return false;
   return userAgent.includes(SOLANA_MOBILE_WEB_SHELL_MARKER);
+}
+
+/**
+ * Android, including the Seeker shell and a Play WebView.
+ *
+ * The shell strips `; wv`, so the marker is checked on its own. Chrome on
+ * Android still contains `Android`. Desktop and iOS stay false.
+ */
+export function isAndroidWalletClient(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  if (isSolanaMobileWebShell(userAgent)) return true;
+  return /Android/i.test(userAgent);
 }
 
 /**
