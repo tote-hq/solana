@@ -242,6 +242,9 @@ class Sandbox:
     # CLI debugging only (agent.py --record). A video cannot skip the card step, so it shows the
     # card being typed: never with a real card, and never from the job API.
     record_dir: str | None = None
+    # The attempt clip. Stopped before the card form, then uploaded and deleted.
+    attempt_path: Path | None = None
+    attempt_open: bool = False
 
     async def start(self, pw: Playwright) -> None:
         isolation = {}
@@ -269,6 +272,31 @@ class Sandbox:
         )
         await self.context.route("**/*", self._guard)
         self.main = await self.context.new_page()
+
+    async def begin_attempt_video(self, path: Path) -> None:
+        """Record the page until end_attempt_video. Failure here does not fail the shop."""
+        self.attempt_path = path
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            await self.main.screencast.start(path=path, size={"width": 1280, "height": 720})
+            self.attempt_open = True
+        except Exception as e:
+            self.attempt_open = False
+            print(f"    video skipped: {type(e).__name__}")
+
+    async def end_attempt_video(self) -> Path | None:
+        """Stop the clip and return its file. A second call does nothing."""
+        if not self.attempt_open:
+            return None
+        self.attempt_open = False
+        try:
+            await self.main.screencast.stop()
+        except Exception as e:
+            print(f"    video skipped: {type(e).__name__}")
+            return None
+        if self.attempt_path and self.attempt_path.is_file():
+            return self.attempt_path
+        return None
 
     async def start_trace(self) -> None:
         # Called only after login: traces record typed values, credentials must not be in them.

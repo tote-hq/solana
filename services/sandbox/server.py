@@ -35,7 +35,8 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pathlib import Path
 import json
 import re
@@ -110,6 +111,28 @@ class JobIn(BaseModel):
     flow: Literal['viewer', 'guided', 'headless'] = 'viewer'
 
 
+_FIELD_CODE = {
+    "dni": "invalid_shopper", "email": "invalid_shopper", "password": "invalid_shopper",
+    "postcode": "invalid_shopper", "street": "invalid_shopper", "number": "invalid_shopper",
+    "phone": "invalid_shopper", "complement": "invalid_shopper",
+    "pan": "invalid_card", "cvv": "invalid_card", "exp_month": "invalid_card",
+    "exp_year": "invalid_card", "holder": "invalid_card", "kind": "invalid_card",
+    "name": "invalid_item", "quantity": "invalid_item", "sku": "invalid_item", "items": "invalid_item",
+    "flow": "invalid_flow", "mode": "invalid_flow",
+    "order_id": "invalid_order", "buyer": "invalid_order", "escrow_deadline": "invalid_order",
+}
+
+
+def rejection_reason(errors: list) -> tuple[str, str]:
+    """A stable code and the field name. Never the submitted value."""
+    for err in errors:
+        parts = [str(part) for part in err.get("loc", ()) if part != "body" and not str(part).isdigit()]
+        if parts:
+            field = parts[-1]
+            return _FIELD_CODE.get(field, "invalid_order"), field
+    return "invalid_order", "body"
+
+
 def auth(authorization: str = Header(default="")) -> None:
     if not TOKEN:
         raise HTTPException(503, "SANDBOX_TOKEN is not set")
@@ -142,7 +165,7 @@ async def worker() -> None:
             # Lines with a SKU go into the cart through VTEX's API at their quantity;
             # the rest are searched for by name.
             out = await run_job(job["items"], secrets=job.pop("shopper", None), card=job.pop("card", None),
-                                on_phase=on_phase)
+                                on_phase=on_phase, job_id=job_id)
             job.update(status=out["status"], phase=out["phase"], result=out, error=out.get("error"))
         except Exception as e:  # noqa: BLE001 — a crashed run is a failed job, never a dead worker
             traceback.print_exc()
@@ -170,6 +193,13 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="changuito sandbox", lifespan=lifespan)
 
 
+@app.exception_handler(RequestValidationError)
+async def rejected_job(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    code, field = rejection_reason(exc.errors())
+    print(f"POST /jobs rejected {code} field={field}", flush=True)
+    return JSONResponse(status_code=422, content={"detail": code})
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"ok": True, "busy": busy, "queued": queue.qsize(),
@@ -183,6 +213,7 @@ async def create(body: JobIn) -> dict:
                 or body.escrow_deadline < time.time() + 60 or not await sessions.available()):
             raise HTTPException(409, 'manual session unavailable')
         if not re.fullmatch(r'[0-9a-f]{64}', body.order_id):
+            print("POST /jobs rejected invalid_order field=order_id", flush=True)
             raise HTTPException(422, 'invalid manual order')
         record, created = sessions.store.create(body.order_id, body.buyer)
         if created:
@@ -230,7 +261,7 @@ async def manual_worker(job_id: str, job: dict):
         await sessions.control(job_id, sb)
 
     task = asyncio.create_task(run_job(job['items'], secrets=job.pop('shopper'),
-                                      on_phase=phase, on_manual=control))
+                                      on_phase=phase, on_manual=control, job_id=job_id))
     started = time.monotonic()
     try:
         while not task.done():

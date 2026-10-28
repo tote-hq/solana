@@ -206,5 +206,107 @@ class UnattendedPaymentTests(unittest.TestCase):
         self.assertFalse(blocks_unattended_purchase(False, False))
 
 
+class CartPayAgainTests(unittest.TestCase):
+    """Cart, pay, abandon and pay again. The store is sqlite. No browser and no merchant."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = str(Path(self.tmp.name) / 'jobs.sqlite3')
+        self.store = ManualStore(self.path)
+        self.order = 'a' * 64
+        self.job, _ = self.store.create(self.order, 'buyer')
+        self.id = self.job['job_id']
+
+    def tearDown(self):
+        self.store.db.close()
+        self.tmp.cleanup()
+
+    def ready(self, job_id=None):
+        job_id = job_id or self.id
+        self.store.update(job_id, status='running', preparation='preparing')
+        return self.store.ready(job_id)
+
+    def test_available_lines_stay_in_the_cart_and_the_record_has_no_secrets(self):
+        from checkout import landed_lines
+        lines = [
+            {'sku': '111', 'name': 'Yerba', 'quantity': 1},
+            {'sku': '222', 'name': 'Azucar', 'quantity': 2},
+            {'name': 'Sin sku', 'quantity': 1},
+        ]
+        items = [
+            {'id': '111', 'availability': 'available'},
+            {'id': '222', 'availability': 'withoutStock'},
+        ]
+        added, rest = landed_lines(lines, items)
+        self.assertEqual(added, ['Yerba'])
+        self.assertEqual([line['name'] for line in rest], ['Azucar', 'Sin sku'])
+        ready = self.ready()
+        self.assertEqual(ready['purchase'], 'not_started')
+        blob = json.dumps(self.store.get(self.id))
+        for secret in ('card-number', '999', 'shopper-password', 'pan', 'cvv', 'password'):
+            self.assertNotIn(secret, blob)
+
+    def test_paying_is_not_placed_until_the_store_returns_an_order(self):
+        from checkout import normalize_card
+        from manual import purchase_with_store_order, should_pay_unattended
+        self.ready()
+        paying = self.store.update(self.id, purchase='in_progress')
+        self.assertEqual(paying['purchase'], 'in_progress')
+        self.assertIsNone(paying['store_order_id'])
+        self.assertEqual(purchase_with_store_order('in_progress', None), 'in_progress')
+        self.assertEqual(purchase_with_store_order('placed', None), 'in_progress')
+        placed = purchase_with_store_order('in_progress', 'store-order-1')
+        saved = self.store.update(self.id, purchase=placed, store_order_id='store-order-1')
+        self.assertEqual(saved['purchase'], 'placed')
+        self.assertEqual(saved['store_order_id'], 'store-order-1')
+        self.assertIsNone(normalize_card({'pan': '0000', 'cvv': ''}))
+        self.assertFalse(should_pay_unattended('headless', ['cvv']))
+
+    def test_closing_abandons_an_unsent_payment_and_leaves_a_sent_one_unknown(self):
+        from manual import closed_purchase
+        ready = self.ready()
+        token = self.store.card_grant(self.id)
+        closed = self.store.update(
+            self.id, status='done', sessionActive=False, purchase=closed_purchase('not_started'))
+        self.assertEqual(closed['purchase'], 'abandoned')
+        self.assertFalse(closed['sessionActive'])
+        self.assertEqual(closed['preparedAt'], ready['preparedAt'])
+        self.store.update(self.id, preparedAt=None)
+        self.assertEqual(self.store.get(self.id)['preparedAt'], ready['preparedAt'])
+        self.assertFalse(self.store.card_granted(token, self.id))
+
+        other, created = self.store.create('b' * 64, 'buyer')
+        self.assertTrue(created)
+        self.ready(other['job_id'])
+        self.store.update(other['job_id'], purchase='in_progress')
+        sent = self.store.update(
+            other['job_id'], status='done', sessionActive=False,
+            purchase=closed_purchase('in_progress'))
+        self.assertEqual(sent['purchase'], 'unknown')
+        self.assertNotEqual(sent['purchase'], 'placed')
+        self.assertIsNotNone(sent['preparedAt'])
+
+    def test_the_same_order_does_not_open_twice_and_a_new_one_can_be_prepared(self):
+        from manual import closed_purchase
+        self.ready()
+        self.store.update(
+            self.id, status='done', sessionActive=False, purchase=closed_purchase('not_started'))
+        again, created = self.store.create(self.order, 'buyer')
+        self.assertFalse(created)
+        self.assertEqual(again['job_id'], self.id)
+        self.assertEqual(again['purchase'], 'abandoned')
+        self.assertNotEqual(again['status'], 'queued')
+        with self.assertRaises(ValueError):
+            self.store.ready(self.id)
+        fresh, created = self.store.create('c' * 64, 'buyer')
+        self.assertTrue(created)
+        self.assertEqual(fresh['purchase'], 'not_started')
+        prepared = self.ready(fresh['job_id'])
+        self.assertEqual(prepared['purchase'], 'not_started')
+        self.assertIsNotNone(prepared['preparedAt'])
+        self.assertEqual(self.store.get(self.id)['purchase'], 'abandoned')
+        self.assertIsNone(self.store.get(self.id)['store_order_id'])
+
+
 if __name__ == '__main__':
     unittest.main()

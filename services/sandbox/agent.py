@@ -15,6 +15,7 @@ import asyncio
 import json
 import statistics
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -24,6 +25,7 @@ from playwright.async_api import async_playwright
 from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, Score, TypeSafeError
 
 import checkout
+from attempt_video import publish_attempt
 from sandbox import BASE, NO_REPLACE, REPLACE, SECRET_FIELDS, Sandbox, Secrets, Snapshot
 
 PHASES = ("login", "empty_cart", "shop", "checkout", "payment")
@@ -288,7 +290,7 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
                   headed: bool = False,
                   trace: bool = False, max_steps: int = 60, min_confidence: float = 0.15,
                   model: str | None = None, hold: float = 8.0, record: bool = False, on_phase=None,
-                  on_manual=None) -> dict:
+                  on_manual=None, job_id: str | None = None) -> dict:
     """One sandbox run. Returns what changuito's job API reports (services/sandbox/server.py).
 
     `items` are `{name, quantity, sku?}` (a bare string is a name to search for). Lines with a SKU
@@ -308,6 +310,9 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
     run = Run(sb=sb, client=AsyncTypeSafeClient(), headed=headed, model=model,
               min_confidence=min_confidence, max_steps=max_steps)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    clip_dir = Path(tempfile.mkdtemp(prefix="attempt-"))
+    clip_path = clip_dir / "attempt.webm"
+    sealed = False
     trace_dir = Path("traces")
     trace_zip = str(trace_dir / f"run-{stamp}.zip") if trace else None
     if trace:
@@ -335,6 +340,16 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
 
     async with async_playwright() as pw:
         await sb.start(pw)
+        await sb.begin_attempt_video(clip_path)
+
+        async def seal_attempt() -> None:
+            nonlocal sealed
+            if sealed:
+                return
+            sealed = True
+            # Before the card form. A later stop would film the number.
+            publish_attempt(await sb.end_attempt_video(), job_id or stamp)
+
         try:
             status = await sb.goto(BASE + "/login")
             if status != 200:
@@ -372,10 +387,13 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
             enter("shop")
             added, rest = await checkout.add_skus(sb, lines)
             done_items.extend(added)
+            search, refused = checkout.lines_for_search(rest)
             run.form = await sb.order_form()
             print(f"    ✓ by SKU: {len(added)}/{len(lines)} lines  (cart $ {run.form['value']:,.2f})")
-            if rest:
-                names = [l["name"] for l in rest]
+            if refused:
+                print(f"    not added: {len(refused)} sku line(s)")
+            if search:
+                names = [l["name"] for l in search]
                 shopped: list[str] = []
 
                 async def all_added(_: bool) -> bool:
@@ -389,11 +407,15 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
 
             enter("checkout")
             ship = await checkout.set_shipping(sb, strict=bool(on_manual))
+            if ship.get("error") == "store_timeout":
+                result = "store_timeout"
+                raise _Stop
             if on_manual and not ship['ok']:
                 raise RuntimeError('approved delivery unavailable')
             shipping_centavos = ship.get("shipping_centavos")
             print(f"    shipping: {ship['how']}" + (f"  (envío $ {shipping_centavos / 100:,.2f})"
                                                    if shipping_centavos is not None else ""))
+            await seal_attempt()
             if not await checkout.open_payment(sb):
                 await sb.open_cart()
 
@@ -417,6 +439,7 @@ async def run_job(items: list[dict | str], *, secrets: dict | None = None, card:
         except _Stop:
             pass
         finally:
+            await seal_attempt()
             timings[phase] = round(time.perf_counter() - mark, 1)
             try:
                 await sb.highlight(None, f"Jev · {result} · payment {pay['payment']}")
