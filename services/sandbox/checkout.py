@@ -34,16 +34,37 @@ FETCH_JS = """async ([url, method, body]) => {
 }"""
 
 
+# A store call that never returns used to leave checkout running with nothing in the log.
+STORE_TIMEOUT_S = 30
+
+
+async def bounded_store(awaitable, seconds: float = STORE_TIMEOUT_S) -> dict:
+    """The store's fetch, or store_timeout when it does not come back."""
+    try:
+        return await asyncio.wait_for(awaitable, seconds)
+    except TimeoutError:
+        return {"status": 0, "data": None, "error": "store_timeout"}
+
+
+def as_store_timeout(payload: dict | None) -> dict | None:
+    """The shipping result when the store fetch did not return. Not a placed order."""
+    if payload and payload.get("error") == "store_timeout":
+        return {"ok": False, "how": "store_timeout", "shipping_centavos": None, "error": "store_timeout"}
+    return None
+
+
 async def api(sb: Sandbox, path: str, method: str = "GET", body: dict | None = None) -> dict:
     """Call the store's API from the page, with its cookies. Returns {status, data}."""
     try:
-        return await sb.main.evaluate(FETCH_JS, [path, method, body])
+        return await bounded_store(sb.main.evaluate(FETCH_JS, [path, method, body]))
     except Exception as e:  # page mid-navigation
         return {"status": 0, "data": None, "error": type(e).__name__}
 
 
 async def order_form(sb: Sandbox) -> dict:
     r = await api(sb, OF)
+    if r.get("error") == "store_timeout":
+        return {"error": "store_timeout"}
     return r["data"] or {}
 
 
@@ -69,37 +90,64 @@ async def _seller(sb: Sandbox, sku: str) -> str | None:
     return None
 
 
+def landed_lines(lines: list[dict], items: list[dict]) -> tuple[list[str], list[dict]]:
+    """Names the store kept as available, and lines it did not. `items` are order-form rows.
+    No network: the caller already has the form."""
+    in_cart = {str(i.get("id")): i for i in items}
+    added: list[str] = []
+    rest: list[dict] = []
+    for line in lines:
+        got = in_cart.get(str(line.get("sku")))
+        if line.get("sku") and got and got.get("availability", "available") == "available":
+            added.append(line["name"])
+        else:
+            rest.append(line)
+    return added, rest
+
+
 async def add_skus(sb: Sandbox, lines: list[dict]) -> tuple[list[str], list[dict]]:
-    """Add every line that has a SKU in one call. Returns (names added, lines left for Jev)."""
+    """Add every line that has a SKU in one call. Returns (names added, lines not added)."""
     with_sku = [l for l in lines if l.get("sku")]
     rest = [l for l in lines if not l.get("sku")]
     if not with_sku:
         return [], rest
     of = await order_form(sb)
+    if of.get("error") == "store_timeout":
+        print("    store_timeout")
+        return [], rest + with_sku
     order_items = []
     for l in with_sku:
         seller = await _seller(sb, l["sku"])
         if seller is None:
-            print(f"    sku {l['sku']} ({l['name'][:40]}): not sold here, leaving it to Jev")
+            print(f"    sku {l['sku']} ({l['name'][:40]}): not sold here, not added")
             rest.append(l)
             continue
         order_items.append({"id": str(l["sku"]), "quantity": int(l.get("quantity") or 1), "seller": seller})
     if order_items:
         r = await api(sb, f"{OF}/{of['orderFormId']}/items", "POST", {"orderItems": order_items})
         print(f"    add {len(order_items)} skus -> {r['status']}")
+        if r.get("error") == "store_timeout":
+            print("    store_timeout")
+            return [], rest + [line for line in with_sku if line not in rest]
     of = await order_form(sb)
-    in_cart = {str(i.get("id")): i for i in of.get("items", [])}
-    added = []
-    for l in with_sku:
-        if l in rest:
-            continue
-        got = in_cart.get(str(l["sku"]))
-        if got and got.get("availability", "available") == "available":
-            added.append(l["name"])
-        else:
-            print(f"    sku {l['sku']} ({l['name'][:40]}): {got.get('availability') if got else 'rejected'}, leaving it to Jev")
-            rest.append(l)
+    if of.get("error") == "store_timeout":
+        print("    store_timeout")
+        return [], rest + [l for l in with_sku if l not in rest]
+    pending = [l for l in with_sku if l not in rest]
+    added, rejected = landed_lines(pending, of.get("items", []))
+    by_id = {str(i.get("id")): i for i in of.get("items", [])}
+    for l in rejected:
+        got = by_id.get(str(l.get("sku")))
+        why = got.get("availability") if got else "rejected"
+        print(f"    sku {l['sku']} ({l['name'][:40]}): {why}, not added")
+        rest.append(l)
     return added, rest
+
+
+def lines_for_search(rest: list[dict]) -> tuple[list[dict], list[dict]]:
+    """A SKU the store already refused is not searched again. Lines with no SKU still are."""
+    refused = [line for line in rest if line.get("sku")]
+    return [line for line in rest if not line.get("sku")], refused
 
 
 # ---- shipping ------------------------------------------------------------------
@@ -146,6 +194,9 @@ async def set_shipping(sb: Sandbox, strict: bool = False) -> dict:
     """Attach an address and a delivery option. The account's saved address wins; the job's
     postcode and street are the fallback. Billing follows delivery (VTEX's default)."""
     of = await order_form(sb)
+    if stopped := as_store_timeout(of):
+        print("    store_timeout")
+        return stopped
     sd = of.get("shippingData") or {}
     addr = sd.get("address") if _complete(sd.get("address")) else None
     if strict:
@@ -174,6 +225,9 @@ async def set_shipping(sb: Sandbox, strict: bool = False) -> dict:
 
     body = {"clearAddressIfPostalCodeNotFound": False, "selectedAddresses": [addr]}
     r = await api(sb, f"{OF}/{of['orderFormId']}/attachments/shippingData", "POST", body)
+    if stopped := as_store_timeout(r):
+        print("    store_timeout")
+        return stopped
     of = r["data"] or of
     logistics = []
     chosen = []
@@ -189,6 +243,9 @@ async def set_shipping(sb: Sandbox, strict: bool = False) -> dict:
     if logistics:
         body["logisticsInfo"] = logistics
         r = await api(sb, f"{OF}/{of['orderFormId']}/attachments/shippingData", "POST", body)
+        if stopped := as_store_timeout(r):
+            print("    store_timeout")
+            return stopped
         of = r["data"] or of
     ok = r["status"] == 200 and bool(logistics)
     label = f"{how}, {sorted(set(chosen))[0] if chosen else 'no delivery option'}"

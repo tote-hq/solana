@@ -30,6 +30,22 @@ def blocks_unattended_purchase(challenge: bool, refused: bool) -> bool:
     return challenge or refused
 
 
+def closed_purchase(purchase: str) -> str:
+    """What ending the session means. Typing a card, or sending it, is not a placed order."""
+    if purchase == 'not_started':
+        return 'abandoned'
+    if purchase == 'in_progress':
+        return 'unknown'
+    return purchase
+
+
+def purchase_with_store_order(current: str, store_order_id: str | None) -> str:
+    """A purchase becomes placed only when the store returned an order id."""
+    if store_order_id:
+        return 'placed'
+    return current if current != 'placed' else 'in_progress'
+
+
 class ManualSessions:
     def __init__(self):
         self.store: ManualStore | None = None
@@ -116,7 +132,10 @@ class ManualSessions:
                             }''', group)
                             order = next((o for o in orders if o.get('group') == group and o.get('id')), None)
                             if order:
-                                self.store.update(job_id, purchase='placed', store_order_id=order['id'])
+                                self.store.update(
+                                    job_id,
+                                    purchase=purchase_with_store_order(r['purchase'], order['id']),
+                                    store_order_id=order['id'])
                                 break
                 await asyncio.sleep(1)
         finally:
@@ -127,12 +146,8 @@ class ManualSessions:
             sb.context.remove_listener('request', request)
             sb.context.remove_listener('response', response)
             r = self.store.get(job_id)
-            purchase = r['purchase']
-            if purchase == 'not_started':
-                purchase = 'abandoned'
-            elif purchase == 'in_progress':
-                purchase = 'unknown'
-            self.store.update(job_id, status='done', sessionActive=False, purchase=purchase)
+            self.store.update(job_id, status='done', sessionActive=False,
+                              purchase=closed_purchase(r['purchase']))
             await self.disconnect(job_id)
             self.active = None
 

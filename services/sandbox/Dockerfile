@@ -15,7 +15,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev && uv run playwright install chromium
-COPY agent.py checkout.py sandbox.py server.py manual.py manual_store.py start.sh browser.sh ./
+COPY agent.py attempt_video.py checkout.py sandbox.py server.py manual.py manual_store.py start.sh browser.sh ./
 RUN chmod 755 /app/browser.sh
 COPY viewer/index.html ./viewer/index.html
 COPY --from=viewer /viewer/dist ./viewer/dist
