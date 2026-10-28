@@ -73,9 +73,12 @@ describe('checkout dialog accessibility', () => {
 
   it('labels every card field, describes its error, and keeps a 44px control at 390 and 1440', () => {
     for (const id of ['pan', 'holder', 'month', 'year', 'cvv']) {
-      assert.match(html, new RegExp(`id="${id}"[^>]*aria-describedby="${id}-error"`));
       assert.match(html, new RegExp(`id="lbl-${id}"`));
     }
+    for (const id of ['pan', 'holder', 'month', 'year']) {
+      assert.match(html, new RegExp(`id="${id}"[^>]*aria-describedby="${id}-error"`));
+    }
+    assert.match(html, /id="cvv"[^>]*aria-describedby="cvv-error cvv-hint"/);
     assert.match(html, /autocomplete="cc-number"/);
     assert.match(html, /autocomplete="cc-name"/);
     assert.match(html, /autocomplete="cc-exp-month"/);
@@ -85,9 +88,12 @@ describe('checkout dialog accessibility', () => {
     assert.match(html, /min-height:44px/);
     assert.match(html, /color:#7a2e12/);
     assert.match(html, /:focus-visible/);
-    // 1440 stays one row. 390 is under 520, so the code wraps under month and year.
+    // Month, year and the security code stay on one row at 1440 and under 520.
     assert.match(html, /grid-template-columns:minmax\(0,1\.4fr\) minmax\(0,\.8fr\) minmax\(0,1fr\)/);
-    assert.match(html, /@media\(max-width:520px\)\{[\s\S]*grid-column:1 \/ -1/);
+    assert.match(html, /@media\(max-width:520px\)\{[\s\S]*grid-template-columns:minmax\(0,1fr\) minmax\(0,\.72fr\) minmax\(122px,1\.5fr\)/);
+    assert.doesNotMatch(html, /grid-column:\s*1\s*\/\s*-1/);
+    assert.doesNotMatch(html, /class="field-hint"/);
+    assert.match(html, /id="cvv-hint" class="sr-only"/);
   });
 
   it('keeps the rail an ordered list, announces a phase politely, and leaves the timer quiet', () => {

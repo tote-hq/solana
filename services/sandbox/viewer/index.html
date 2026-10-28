@@ -28,8 +28,7 @@ header button,header input{cursor:pointer;min-height:44px}
 }
 #card-form p{margin:0;font-size:13px;line-height:1.4;color:var(--card-muted)}
 #card-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--card-muted);min-width:0;max-width:100%}
-.lbl{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
-.field-hint{font-weight:400;font-size:12px;line-height:1.3;color:var(--card-muted)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #card-form input:not([type="radio"]),#card-form select,#apply-card{
   font-size:16px;line-height:1.3;color:var(--card-text);background:var(--card-surface);
   border:1px solid var(--card-border);border-radius:10px;padding:10px 12px;
@@ -52,7 +51,9 @@ header button:focus-visible,header input:focus-visible{outline:2px solid var(--c
 #card-form .kinds label:has(input:focus-visible){outline:2px solid var(--card-focus);outline-offset:2px}
 #card-form .kinds input{appearance:auto;width:18px;height:18px;min-height:18px;min-width:18px;max-width:18px;flex:0 0 18px;padding:0;margin:0;border:0;background:transparent;accent-color:var(--card-brand-ink)}
 #card-form .kinds input:focus-visible{outline:none}
-.expiry{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1fr);gap:10px;min-width:0}
+.expiry{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr) minmax(0,1fr);gap:10px;min-width:0;align-items:start}
+#card-form .expiry>label>span:not(.err){display:block;height:16px;line-height:16px;white-space:nowrap}
+#card-form .expiry input,#card-form .expiry select{height:44px;min-height:44px;max-height:44px}
 .err{display:flex;align-items:flex-start;gap:6px;min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:12px;font-weight:400;line-height:1.35;color:#7a2e12;color:var(--card-error)}
 .err[hidden]{display:none}
 .err::before{content:"";flex:0 0 16px;width:16px;height:16px;margin-top:1px;background:currentColor;-webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='black' d='M8 1.2 15 14.2H1L8 1.2zm0 4.1a.75.75 0 0 0-.75.75v3.2a.75.75 0 0 0 1.5 0V6.05A.75.75 0 0 0 8 5.3zm0 6.15a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z'/></svg>") center/contain no-repeat;mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='black' d='M8 1.2 15 14.2H1L8 1.2zm0 4.1a.75.75 0 0 0-.75.75v3.2a.75.75 0 0 0 1.5 0V6.05A.75.75 0 0 0 8 5.3zm0 6.15a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z'/></svg>") center/contain no-repeat}
@@ -68,8 +69,7 @@ html[data-part=form] header, html[data-part=form] #screen { display: none }
 html[data-part=form], html[data-part=form] body { height: auto; min-height: 0; background: #fafaf7; color: #2a1a14 }
 html[data-part=screen] #card-form { display: none }
 @media(max-width:520px){
-  .expiry{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .expiry label:last-child{grid-column:1 / -1}
+  .expiry{grid-template-columns:minmax(0,1fr) minmax(0,.72fr) minmax(122px,1.5fr)}
 }
 html[data-theme="dark"] #card-form{
   --card-bg:#241814;--card-surface:#2a1e19;--card-text:#fafaf7;--card-muted:#e4d5cc;
@@ -127,11 +127,12 @@ html[data-theme="dark"][data-part=form], html[data-theme="dark"][data-part=form]
       <span id="year-error" class="err" hidden></span>
     </label>
     <label>
-      <span class="lbl"><span id="lbl-cvv">Código de seguridad</span><span id="cvv-hint" class="field-hint">3 o 4 dígitos</span></span>
-      <input id="cvv" name="cvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" spellcheck="false" aria-describedby="cvv-error" aria-invalid="false">
+      <span id="lbl-cvv">Código de seguridad</span>
+      <input id="cvv" name="cvv" inputmode="numeric" autocomplete="cc-csc" maxlength="4" spellcheck="false" aria-describedby="cvv-error cvv-hint" aria-invalid="false">
       <span id="cvv-error" class="err" hidden></span>
     </label>
   </div>
+  <span id="cvv-hint" class="sr-only">3 o 4 dígitos</span>
   <p id="card-status" role="status" tabindex="-1"></p>
   <button id="apply-card" type="button">Cargar en Día</button>
 </form>
