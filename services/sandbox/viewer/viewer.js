@@ -23,8 +23,11 @@ const copy = {
   es: {
     kind: 'Tipo de tarjeta', debit: 'Débito', credit: 'Crédito',
     pan: 'Número de tarjeta', holder: 'Nombre y apellido', month: 'Mes', year: 'Año', cvv: 'Código de seguridad',
-    hint: 'Mes y año se eligen acá. El teclado de arriba es para el captcha y la verificación.',
-    hintForm: 'Mes y año se eligen acá.',
+    hint: 'La usamos solo para este pago. Elegí mes y año acá; el teclado de arriba es para el captcha y la verificación.',
+    hintForm: 'La usamos solo para este pago en Día. No queda guardada.',
+    cvvHint: '3 o 4 dígitos',
+    monthPlaceholder: 'MM',
+    yearPlaceholder: 'AA',
     apply: 'Cargar en Día', update: 'Actualizar tarjeta', working: 'Cargando la tarjeta…',
     done: 'Tarjeta cargada en el checkout de Día. Podés corregirla y actualizarla hasta pagar.',
     partial: 'Día no tomó: ',
@@ -43,8 +46,11 @@ const copy = {
   en: {
     kind: 'Card type', debit: 'Debit', credit: 'Credit',
     pan: 'Card number', holder: 'Name on card', month: 'Month', year: 'Year', cvv: 'Security code',
-    hint: 'Choose the month and year here. The keyboard above is for the captcha and verification.',
-    hintForm: 'Choose the month and year here.',
+    hint: 'Used only for this payment. Choose the month and year here; the keyboard above is for the captcha and verification.',
+    hintForm: 'Used only for this DIA payment. It is not saved.',
+    cvvHint: '3 or 4 digits',
+    monthPlaceholder: 'MM',
+    yearPlaceholder: 'YY',
     apply: 'Load into DIA', update: 'Update card', working: 'Loading the card…',
     done: 'Card loaded into the DIA checkout. You can correct it and update it until you pay.',
     partial: 'DIA did not take: ',
@@ -64,20 +70,38 @@ const copy = {
 
 function text() { return copy[lang]; }
 
+function applyTheme(theme) {
+  const next = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  document.documentElement.style.colorScheme = next;
+}
+
+/** Tells the checkout dialog how tall the form is. The message is a number, never card fields. */
+let reportedHeight = 0;
+function reportFormHeight() {
+  if (part !== 'form' || !permitted || !parentOrigin) return;
+  const height = Math.ceil(form.getBoundingClientRect().height);
+  if (!height || height === reportedHeight) return;
+  reportedHeight = height;
+  parent.postMessage({ type: 'changuito-form-height', height }, parentOrigin);
+}
+
 function fillSelects() {
   const selectedMonth = month.value;
   const selectedYear = year.value;
-  const months = text().months;
-  month.replaceChildren(new Option('—', ''));
-  months.forEach((name, index) => {
+  const t = text();
+  month.replaceChildren(new Option(t.monthPlaceholder, ''));
+  t.months.forEach((name, index) => {
     const value = String(index + 1).padStart(2, '0');
-    month.append(new Option(`${value} — ${name}`, value));
+    const option = new Option(value, value);
+    option.title = name;
+    month.append(option);
   });
   month.value = selectedMonth;
-  if (!year.options.length) {
-    const start = new Date().getFullYear();
-    year.append(new Option('—', ''));
-    for (let value = start; value <= start + 12; value += 1) year.append(new Option(String(value), String(value)));
+  const start = new Date().getFullYear();
+  year.replaceChildren(new Option(t.yearPlaceholder, ''));
+  for (let value = start; value <= start + 12; value += 1) {
+    year.append(new Option(String(value).slice(-2), String(value)));
   }
   year.value = selectedYear;
 }
@@ -94,9 +118,11 @@ function applyCopy() {
   document.getElementById('lbl-month').textContent = t.month;
   document.getElementById('lbl-year').textContent = t.year;
   document.getElementById('lbl-cvv').textContent = t.cvv;
+  document.getElementById('cvv-hint').textContent = t.cvvHint;
   document.getElementById('card-hint').textContent = part === 'form' ? t.hintForm : t.hint;
   if (!apply.disabled) apply.textContent = applied ? t.update : t.apply;
   fillSelects();
+  reportFormHeight();
 }
 
 function fieldError(input, id, message) {
@@ -123,7 +149,14 @@ function ready() {
 }
 
 window.addEventListener('message', event => {
-  if (!permitted || event.source !== parent || event.origin !== parentOrigin || event.data?.type !== 'changuito-viewer-connect') return;
+  if (!permitted || event.source !== parent || event.origin !== parentOrigin) return;
+  if (event.data?.type === 'changuito-viewer-theme') {
+    applyTheme(event.data.theme);
+    reportedHeight = 0;
+    reportFormHeight();
+    return;
+  }
+  if (event.data?.type !== 'changuito-viewer-connect') return;
   const { jobId } = event.data;
   if (!/^[0-9a-f]{32}$/.test(jobId)) return;
   const ticket = event.data.ticket || '';
@@ -131,6 +164,7 @@ window.addEventListener('message', event => {
   if (part !== 'form' && !ticketOk) return;
   cardToken = /^[A-Za-z0-9_-]{40,64}$/.test(event.data.cardToken || '') ? event.data.cardToken : '';
   lang = event.data.lang === 'en' ? 'en' : 'es';
+  applyTheme(event.data.theme);
   applyCopy();
   form.dataset.jobId = jobId;
   if (!ticketOk) return;
@@ -248,4 +282,15 @@ apply.addEventListener('click', async () => {
 });
 
 applyCopy();
+if (part === 'form' && typeof ResizeObserver === 'function') {
+  let pending = 0;
+  const observer = new ResizeObserver(() => {
+    if (pending) return;
+    pending = requestAnimationFrame(() => {
+      pending = 0;
+      reportFormHeight();
+    });
+  });
+  observer.observe(form);
+}
 ready();

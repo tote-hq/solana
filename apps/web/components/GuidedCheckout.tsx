@@ -6,6 +6,7 @@ import { announcedPhase, flowCopy, flowScreen, type SteppedFlow } from '../lib/c
 import type { StatusResponse } from '../lib/checkout/types.ts';
 import { fetchAs } from '../lib/fetch-as.ts';
 import { useWallet } from '../lib/use-wallet.ts';
+import frameStyles from './checkout-card-frame.module.css';
 import { useLang } from './LangProvider';
 
 /**
@@ -79,6 +80,7 @@ export function GuidedCheckout({ orderId, flow, status, pesos, cardSent, onUpdat
         type: 'changuito-viewer-connect',
         jobId: result.jobId,
         lang: locale,
+        theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
         ...(part === 'form' ? { cardToken: result.cardToken ?? '' } : { ticket: result.ticket }),
       };
       setSrc(url.toString());
@@ -106,10 +108,29 @@ export function GuidedCheckout({ orderId, flow, status, pesos, cardSent, onUpdat
         if (flowRef.current === 'headless') onCardRef.current();
         else setCardReady(true);
       }
+      if (event.data?.type === 'changuito-form-height' && frame.current?.dataset.part === 'form') {
+        const height = Number(event.data.height);
+        if (Number.isFinite(height)) {
+          const next = Math.min(840, Math.max(280, Math.ceil(height)));
+          frame.current.style.height = `${next}px`;
+        }
+      }
     }
     window.addEventListener('message', message);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => { window.removeEventListener('message', message); window.clearInterval(timer); };
+    const theme = window.matchMedia('(prefers-color-scheme: dark)');
+    function sendTheme() {
+      const origin = viewerOrigin.current;
+      const target = frame.current?.contentWindow;
+      if (!origin || !target) return;
+      target.postMessage({ type: 'changuito-viewer-theme', theme: theme.matches ? 'dark' : 'light' }, origin);
+    }
+    theme.addEventListener('change', sendTheme);
+    return () => {
+      window.removeEventListener('message', message);
+      window.clearInterval(timer);
+      theme.removeEventListener('change', sendTheme);
+    };
   }, []);
 
   async function action(path: 'cancel' | 'start') {
@@ -148,7 +169,8 @@ export function GuidedCheckout({ orderId, flow, status, pesos, cardSent, onUpdat
       ref={frame}
       src={src}
       title={screen === 'browser' ? words.browserFrame(pesos) : words.formFrame}
-      className={screen === 'browser' ? 'ck-flow-frame ck-flow-browser' : 'ck-flow-frame'}
+      data-part={screen === 'browser' ? 'screen' : 'form'}
+      className={screen === 'browser' ? 'ck-flow-frame ck-flow-browser' : frameStyles.formFrame}
       referrerPolicy="origin"
       sandbox="allow-scripts allow-same-origin"
     /> : null}
