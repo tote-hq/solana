@@ -1,9 +1,13 @@
 import { requireHuman } from './human-gate.ts';
 import { mintUserToken, sessionSecret, userCookieHeader } from './login-gate.ts';
 import { signInHost, verifySignInProof } from './mobile-session.ts';
+import { limitNativeSession, wantsBearerSession } from './native-session-auth.ts';
 import { verifyPrivyToken } from './privy-server.ts';
 import { isSolanaAddress } from './solana.ts';
 import { WALLET_HEADER } from './wallet-header.ts';
+
+/** A wallet proof is a short signed message. A Privy token is a JWT. */
+const MAX_LOGIN_BODY = 32_768;
 
 /**
  * POST /api/session/login — issue `chg_user`.
@@ -11,38 +15,58 @@ import { WALLET_HEADER } from './wallet-header.ts';
  * Two proofs, and neither is an address on its own:
  *   - `{ token }`: a Privy access token. The server verifies it against
  *     Privy's JWKS and reads the selected linked Solana wallet from Privy.
+ *     This path requires the Turnstile cookie. A phone wallet cannot obtain
+ *     one, and that is not a reason to drop the check here.
  *   - `{ walletProof }`: a phone wallet (Mobile Wallet Adapter). The server
  *     wrote the message (lib/mobile-session.ts); the wallet signed those
  *     exact bytes; the signature is checked here before the cookie exists.
+ *     The Turnstile cookie is not required. A body that carries `walletProof`
+ *     never falls through to the Privy token.
  *
  * Everything downstream (chat limits, checkout, orders) reads the address
- * from this cookie.
+ * from this cookie. The JSON may also carry `sessionToken` — the same value
+ * as the cookie — and only when the wallet path is asked for it. It is not
+ * logged.
  */
 export async function issueUserSession(
   req: Request,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now(),
 ): Promise<Response> {
+  let text = '';
+  try {
+    text = await req.text();
+  } catch {
+    text = '';
+  }
+
+  let body: unknown;
+  let parsed = false;
+  if (text.length <= MAX_LOGIN_BODY) {
+    try {
+      body = JSON.parse(text);
+      parsed = true;
+    } catch {
+      parsed = false;
+    }
+  }
+  const proof = parsed ? walletProofOf(body) : undefined;
+  if (proof) {
+    const limited = await limitNativeSession(req, 'wallet-login', env, proof.address);
+    if (limited) return limited;
+    const secret = sessionSecret(env);
+    if (!secret) return unconfigured();
+    return issueFromWalletProof(req, proof, secret, now);
+  }
+
+  // Privy, a missing body, and a body that is not a wallet proof. The human
+  // check runs before any of that is treated as a login.
   const gated = await requireHuman(req, env);
   if (gated) return gated;
 
   const secret = sessionSecret(env);
-  if (!secret) {
-    console.error('[session] CHG_SESSION_SECRET is not set in production — refusing to sign sessions.');
-    return Response.json(
-      { error: 'session_unconfigured', message: 'El inicio de sesión no está disponible ahora.' },
-      { status: 503 },
-    );
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: 'expected_json' }, { status: 400 });
-  }
-  const proof = walletProofOf(body);
-  if (proof) return issueFromWalletProof(req, proof, secret, now);
+  if (!secret) return unconfigured();
+  if (!parsed) return Response.json({ error: 'expected_json' }, { status: 400 });
 
   const raw = (body as { token?: unknown } | null)?.token;
   const token = typeof raw === 'string' ? raw.trim() : '';
@@ -119,8 +143,25 @@ async function issueFromWalletProof(
     );
   }
   const cookie = await mintUserToken(proof.address, secret, now);
-  return new Response(JSON.stringify({ ok: true, address: proof.address }), {
+  // The cookie is what the browser stores. `sessionToken` is that same value,
+  // returned only when a native client asks, because it cannot read Set-Cookie.
+  // The web login does not ask, so its JSON stays { ok, address }.
+  const payload: { ok: true; address: string; sessionToken?: string } = { ok: true, address: proof.address };
+  if (wantsBearerSession(req)) payload.sessionToken = cookie;
+  return new Response(JSON.stringify(payload), {
     status: 200,
-    headers: { 'content-type': 'application/json', 'set-cookie': userCookieHeader(cookie) },
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      'set-cookie': userCookieHeader(cookie),
+    },
   });
+}
+
+function unconfigured(): Response {
+  console.error('[session] CHG_SESSION_SECRET is not set in production — refusing to sign sessions.');
+  return Response.json(
+    { error: 'session_unconfigured', message: 'El inicio de sesión no está disponible ahora.' },
+    { status: 503 },
+  );
 }
