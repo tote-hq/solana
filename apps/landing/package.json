@@ -11,18 +11,32 @@
     "build": "next build",
     "start": "next start -p 3125",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"lib/test/*.test.ts\""
+    "test": "node --experimental-strip-types --test \"lib/test/*.test.ts\"",
+    "dev:vinext": "vite dev --port 3125",
+    "build:vinext": "vite build",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "vinext-cloudflare deploy"
   },
   "dependencies": {
     "@changuito/trust": "*",
+    "@vinext/cloudflare": "^1.3.1",
     "next": "16.3.5",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-server-dom-webpack": "^19.3.1",
+    "vinext": "^1.4.1"
   },
   "devDependencies": {
-    "@types/node": "22.10.2",
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.10",
+    "@types/node": "22.19.1",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
-    "typescript": "5.9.3"
-  }
+    "@vitejs/plugin-react": "^6.0.0",
+    "@vitejs/plugin-rsc": "^0.5.37",
+    "cf": "1.0.0-beta.27",
+    "postcss": "^8.5.6",
+    "typescript": "5.9.3",
+    "vite": "8.3.0"
+  },
+  "type": "module"
 }

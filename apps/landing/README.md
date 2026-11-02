@@ -17,7 +17,11 @@ Crear un **proyecto nuevo**, no reusar el de `apps/web`.
 | Build command | default — corre `next build` de este paquete |
 | Environment variables | el sitio se construye sin ellas. `/whitelist` en producción no anota a nadie si faltan Turnstile o un destino. `/reportarbug` funciona sin variables (ver abajo). |
 
-Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`.
+Dominio de producción: `www.changuito.me`. `app.changuito.me` sigue en el proyecto de `apps/web`. El DNS no se cambia desde el repo.
+
+## Cloudflare Workers
+
+El mismo paquete también se despliega como el Worker `changuito-landing` (`npm run deploy:vinext -w @changuito/landing`). `next build` sigue siendo el build de Vercel. Las variables de abajo se cargan en el dashboard de Cloudflare, nunca en el repo. Las que empiezan con `NEXT_PUBLIC_` tienen que existir en el momento del build.
 
 La lista de espera vive en `/whitelist`. No hace falta login de Vercel para mergear el código: el próximo deploy toma la ruta. Sin un destino configurado, producción responde que no pudo anotar a la persona (no finge el alta). En `next dev` / `next start` local, si no hay variables, el alta se agrega a `apps/landing/.data/waitlist.jsonl` (gitignored).
 
