@@ -314,6 +314,9 @@ export function __resetTurnCounterForTests(next?: TurnCounter): void {
 }
 
 export function guestTurnCounter(env: NodeJS.ProcessEnv = process.env): TurnCounter {
+  // A request that arrived before the database binding was visible must not
+  // stick the isolate on the closed counter once the binding is there.
+  if (counter?.kind === 'unavailable' && hasDatabase(env)) counter = undefined;
   if (!counter) {
     if (hasDatabase(env)) counter = postgresCounter();
     else if (env.NODE_ENV === 'production') {

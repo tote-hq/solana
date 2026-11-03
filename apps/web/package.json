@@ -2,17 +2,24 @@
   "name": "@changuito/web",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev -p 3124",
     "prebuild": "tsc -p ../../packages/mcp",
     "build": "next build",
     "start": "next start -p 3124",
+    "prebuild:vinext": "tsc -p ../../packages/mcp",
+    "dev:vinext": "vite dev --port 3124",
+    "build:vinext": "vite build",
+    "start:vinext": "vinext start",
+    "deploy:vinext": "tsc -p ../../packages/mcp && vinext-cloudflare deploy",
     "typecheck": "tsc --noEmit",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "test": "node --experimental-strip-types --test \"lib/test/*.test.ts\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.127.0",
+    "@cfworker/json-schema": "^4.1.4",
     "@changuito/mcp": "*",
     "@changuito/trust": "*",
     "@modelcontextprotocol/sdk": "1.30.0",
@@ -22,18 +29,26 @@
     "@solana-program/system": "^0.15.0",
     "@solana-program/token": "^0.17.0",
     "@solana/kit": "^8.4.0",
+    "@vinext/cloudflare": "^1.3.2",
     "@wallet-standard/app": "1.1.1",
     "jose": "^6.1.0",
     "next": "16.3.5",
     "postgres": "^3.4.9",
     "qr.js": "0.0.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-server-dom-webpack": "^19.3.1",
+    "vinext": "^1.4.2"
   },
   "devDependencies": {
-    "@types/node": "22.10.2",
+    "@cloudflare/vite-plugin": "^2.0.0-beta.v.10",
+    "@types/node": "^22.19.1",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
-    "typescript": "5.9.3"
+    "@vitejs/plugin-react": "^6.2.1",
+    "@vitejs/plugin-rsc": "^0.5.38",
+    "cf": "^1.0.0-beta.27",
+    "typescript": "5.9.3",
+    "vite": "^8.3.0"
   }
 }
