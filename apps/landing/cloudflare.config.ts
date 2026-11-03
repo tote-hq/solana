@@ -19,8 +19,10 @@ const publicEnv = Object.fromEntries(
 export default defineConfig({
   worker: defineWorker({
     name: "changuito-landing",
-    entrypoint: "vinext/server/fetch-handler",
+    entrypoint: "./cache-worker.ts",
     compatibilityDate: "2026-11-02",
+    // A hit is served before this worker runs, so it is not an invocation.
+    cache: { enabled: true },
     compatibilityFlags: ["nodejs_compat"],
     assets: {
       htmlHandling: "none",
