@@ -231,6 +231,10 @@ export function useChat(auth?: UseChatAuth) {
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let rest = '';
+      // An error event is already the explanation. The route then closes the
+      // stream without a `done`, and treating that close as a second failure
+      // painted "Se cortó la conexión" under the real error.
+      let explained = false;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -238,14 +242,16 @@ export function useChat(auth?: UseChatAuth) {
         rest = parsed.rest;
         for (const e of parsed.events) {
           if (e.t === 'done') snapshot.current = e.snapshot;
+          if (e.t === 'error') explained = true;
           setState((s) => applyEvent(s, e));
         }
       }
       // The stream ended without a `done`: the route died mid-turn. Whether
       // that message counts as sent depends on how far it got, which is what
-      // failTurn reads off the transcript.
+      // failTurn reads off the transcript. `endTurn` only unlocks the composer
+      // when the error event already said why.
       setState((s) =>
-        failTurn(s, { reason: 'network', message: inLang(lang, NET.cutOut) }),
+        explained ? endTurn(s) : failTurn(s, { reason: 'network', message: inLang(lang, NET.cutOut) }),
       );
     } catch (err) {
       if (controller.signal.aborted) {
