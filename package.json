@@ -28,7 +28,8 @@
     "program:build": "cd anchor/programs/changuito_escrow && cargo build-sbf --tools-version v1.56 --arch v3",
     "deploy:devnet": "./scripts/solana-deploy.sh",
     "devnet:init": "node --experimental-strip-types scripts/solana-init.mts --no-smoke",
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "test:integration:escrow": "./scripts/integration/escrow-local.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.55.1"
