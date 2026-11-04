@@ -16,6 +16,7 @@ order settles the escrow; anything else refunds it. Solana devnet only.
 | [sandbox.md](sandbox.md) | the checkout robot: what it does on Día's site, what it is kept from doing, and how it is served |
 | [tech-stack.md](tech-stack.md) | the dependency list with versions, the data stores, every environment variable, and the Privy setup |
 | [e2e.md](e2e.md) | Playwright smokes against the live sites, and the GitHub Actions secrets |
+| [testing-strategy.md](testing-strategy.md) | unit / integration / E2E pyramid, test-data rules, Testcontainers vs Compose |
 
 Elsewhere in the repo:
 
