@@ -1,6 +1,7 @@
-# Unit tests on every pull request and on every push to main.
-# Playwright does not live here. See e2e.yml.
-name: Unit
+# Unit + local-validator integration tests.
+# Playwright stays in e2e.yml. This workflow never deploys (no Vercel /
+# Cloudflare actions, no environments that trigger a host).
+name: Tests
 
 on:
   pull_request:
@@ -8,23 +9,23 @@ on:
     branches: [main]
 
 concurrency:
-  group: unit-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  unit:
     name: npm test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup Node from .nvmrc
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -39,3 +40,39 @@ jobs:
       # app's types import. Test files are typechecked too.
       - name: Typecheck (web)
         run: npm run typecheck -w @changuito/web
+
+  integration:
+    name: escrow (solana-test-validator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node from .nvmrc
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Solana / Agave toolchain
+        env:
+          SOLANA_RELEASE: 'v4.4.0'
+        run: |
+          set -euo pipefail
+          sh -c "$(curl -sSfL "https://release.anza.xyz/${SOLANA_RELEASE}/install")"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+          cargo-build-sbf --version
+
+      - name: Cache cargo / platform-tools
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: anchor
+
+      - name: Escrow against local validator
+        run: npm run test:integration:escrow

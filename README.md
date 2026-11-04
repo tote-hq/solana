@@ -318,10 +318,19 @@ The annotated list is in [`apps/web/.env.example`](apps/web/.env.example). Deplo
 (Vercel for the app, Railway for the sandbox) is covered in **[DEPLOY.md](DEPLOY.md)**.
 
 ```bash
-npm test -w @changuito/web
+npm test                         # mcp · trust · web · landing
+npm run test:integration:escrow  # local solana-test-validator: open/settle, refund, BasketMismatch
 npm run typecheck -w @changuito/web
 npm run build
 ```
+
+`test:integration:escrow` builds the SBF program, boots `solana-test-validator`
+with `--bpf-program` at the declared program id, and runs open→settle,
+open→refund, and settle-with-wrong-basket against throwaway keypairs. Needs the
+Solana/Agave CLI (`cargo-build-sbf`, `solana-test-validator`). Ledger state
+stays under `test-ledger/` (gitignored). Buyer self-refund after expiry is not
+waited out here (`MIN_TIMEOUT` is five minutes). See
+[docs/testing-strategy.md](docs/testing-strategy.md).
 
 Some web tests still pin behaviour from the Stellar version. They are listed, not
 edited, in the commit that made the port. See [CLAUDE.md](CLAUDE.md) for why the

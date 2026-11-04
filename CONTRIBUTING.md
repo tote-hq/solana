@@ -22,6 +22,9 @@ Never commit secrets, keys, or `.env` files. `.env.example` lists variable names
 
 ```bash
 npm test
+npm run test:integration:escrow   # needs Solana/Agave CLI
 npm run typecheck -w @changuito/web
 npm run build
 ```
+
+Testing levels and CI layout: [docs/testing-strategy.md](docs/testing-strategy.md).
