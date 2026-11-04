@@ -352,5 +352,6 @@ deployments.json          what is deployed on devnet, and the evidence txs
 | [docs/sandbox.md](docs/sandbox.md) | the job API and what the sandbox will and will not do |
 | [docs/flows.md](docs/flows.md) | a chat turn and a checkout, end to end |
 | [docs/tech-stack.md](docs/tech-stack.md) | dependencies and environment |
+| [docs/testing-strategy.md](docs/testing-strategy.md) | unit / integration / E2E, test-data rules, Testcontainers vs Compose |
 | [DEPLOY.md](DEPLOY.md) | devnet program, Vercel, Railway |
 | [CLAUDE.md](CLAUDE.md) | how the agent's behaviour was arrived at, and what not to undo |
