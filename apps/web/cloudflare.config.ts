@@ -1,5 +1,19 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
 
+// Privy stays off the app.changuito.me worker. The sol.changuito.me
+// deploy sets CHANGUITO_PRIVY=1 so the public app id is inlined there.
+if (process.env.CHANGUITO_PRIVY !== "1") delete process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+
+// This repo is the Solana shop. The defaults are changuito-sol and
+// sol.changuito.me so a deploy without the env vars cannot land on
+// changuito-web (app.changuito.me). Set the vars only to aim elsewhere.
+const workerName = process.env.CHANGUITO_WORKER_NAME?.trim() || "changuito-sol";
+const hostRaw = process.env.CHANGUITO_WORKER_HOSTS;
+const hostnames = (hostRaw === undefined ? "sol.changuito.me" : hostRaw)
+  .split(",")
+  .map((host) => host.trim())
+  .filter(Boolean);
+
 const publicNames = [
   "NEXT_PUBLIC_PRIVY_APP_ID",
   "NEXT_PUBLIC_SOLANA_RPC_URL",
@@ -9,8 +23,8 @@ const publicNames = [
   "NEXT_PUBLIC_CLARITY_PROJECT_ID",
 ] as const;
 
-// Present only for the machine that builds. Absent keys stay on the dashboard
-// instead of being wiped by a deploy that does not have them.
+// A non-empty value is uploaded as plain text. An empty or absent one is
+// omitted, and this CLI then removes that binding on the worker.
 const publicEnv = Object.fromEntries(
   publicNames.flatMap((name) => {
     const value = process.env[name];
@@ -20,7 +34,7 @@ const publicEnv = Object.fromEntries(
 
 export default defineConfig({
   worker: defineWorker({
-    name: "changuito-web",
+    name: workerName,
     entrypoint: "./worker.ts",
     compatibilityDate: "2026-11-02",
     compatibilityFlags: ["nodejs_compat"],
@@ -29,14 +43,22 @@ export default defineConfig({
       notFoundHandling: "none",
       runWorkerFirst: ["/*", "!/_next/static/*", "!/*/_next/static/*"],
     },
-    domains: [
-      { hostname: "app.changuito.me", production: true, previews: false },
-    ],
+    ...(hostnames.length
+      ? {
+          domains: hostnames.map((hostname) => ({
+            hostname,
+            production: true,
+            previews: false,
+          })),
+        }
+      : {}),
     workersDev: true,
     previewUrls: false,
     env: {
       ASSETS: bindings.assets(),
-      HYPERDRIVE: bindings.hyperdrive({ id: "48c7d2df818f47989be24cfd3dd046dc" }),
+      HYPERDRIVE: bindings.hyperdrive({
+        id: process.env.CHANGUITO_HYPERDRIVE_ID?.trim() || "051609800b6844ecade2b88425a7e39f",
+      }),
       ...publicEnv,
     },
   }),

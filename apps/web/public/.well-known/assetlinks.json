@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "me.changuito.sol",
+      "sha256_cert_fingerprints": [
+        "DB:95:A8:8B:CD:A9:44:80:C3:A8:40:60:B6:A8:F9:9C:A9:1A:81:08:59:6D:59:9F:1D:5B:E6:2F:5D:C0:1E:20"
+      ]
+    }
+  }
+]

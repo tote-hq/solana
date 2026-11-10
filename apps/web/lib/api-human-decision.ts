@@ -38,6 +38,11 @@ export async function apiHumanDecision(
   // Its handler checks a bearer of its own.
   if (isCheckoutServiceCallback(path, req.method)) return { kind: 'allow' };
 
+  // The Seeker wallet fetches this file to confirm the app. It is public,
+  // and the check has to run before the crawler test: a verifier whose
+  // user agent matches that list would otherwise get "Solo humanos."
+  if (req.method === 'GET' && path === '/.well-known/assetlinks.json') return { kind: 'allow' };
+
   const ua = req.headers.get('user-agent') ?? '';
   if (AI_BOT_UA.test(ua)) return { kind: 'bot' };
 
