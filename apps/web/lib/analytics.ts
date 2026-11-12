@@ -130,6 +130,8 @@ export function errorCode(message: string): string {
   if (message.startsWith('Se cortó la conexión')) return 'connection';
   if (message.startsWith('Se cortó la respuesta')) return 'connection';
   if (message.startsWith('La respuesta se cortó')) return 'truncated';
+  if (message.startsWith('La búsqueda no está disponible ahora')) return 'provider';
+  if (message.startsWith('Search is unavailable right now')) return 'provider';
   if (message.startsWith('La búsqueda tardó demasiado')) return 'timeout';
   if (message.startsWith('Ollama tardó demasiado')) return 'local_model';
   if (message.startsWith('El modelo local falló')) return 'local_model';
