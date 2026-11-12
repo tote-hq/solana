@@ -43,3 +43,7 @@ contracts/**/test_snapshots/
 *.webm
 *.mp4
 *.mov
+
+# Throwaway keys / local validator state from integration tests
+*.keypair.json
+test-ledger/
