@@ -20,12 +20,15 @@ const adapters = new Map<string, RetailerAdapter>(
 
 export const RETAILER_IDS = [...adapters.keys()] as const;
 
-/** Coto is researched but not implemented — different stack entirely. See research/03-coto-api.md */
+/**
+ * Coto is not a VTEX store. Anonymous Constructor search was probed and recorded;
+ * the Oracle ATG cart was not. See probes/coto-vs-jumbo-2026-11-17.md.
+ */
 export const UNSUPPORTED: Record<string, string> = {
   coto:
     'Coto is not on VTEX. Its search runs on Constructor.io and its cart on Oracle ATG ' +
-    '(/rest/model/atg/actors/cCarritoActor/...), which is undocumented. Search is understood ' +
-    'and reproducible (see probes/04_coto.sh); the cart is not implemented yet.',
+    '(/rest/model/atg/actors/cCarritoActor/...), which is undocumented. The anonymous ' +
+    'search probe is recorded in probes/coto-vs-jumbo-2026-11-17.md. The cart is not implemented.',
 };
 
 export function getAdapter(id: string): RetailerAdapter {
