@@ -42,7 +42,7 @@ export const NEW_TAB_HINT = 'se abre en una pestaña nueva';
  * Legal pages, the account-deletion page and the landing footer all read
  * this one constant.
  */
-export const SUPPORT_EMAIL = 'contact@simonethg.com';
+export const SUPPORT_EMAIL = 'simonethg@changuito.me';
 
 /** Marketing site. The public legal and account-deletion pages live here. */
 export const PUBLIC_SITE_URL = 'https://www.changuito.me';

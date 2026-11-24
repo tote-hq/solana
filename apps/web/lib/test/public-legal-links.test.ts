@@ -20,7 +20,7 @@ test('the shopper footer keeps /privacidad and links out to the public terms and
   assert.equal(PUBLIC_LEGAL.deletion.es, 'https://www.changuito.me/eliminar-cuenta');
   assert.equal(PUBLIC_LEGAL.terms.en, 'https://www.changuito.me/terms');
   assert.equal(PUBLIC_LEGAL.privacy.es, 'https://www.changuito.me/privacidad');
-  assert.equal(SUPPORT_EMAIL, 'contact@simonethg.com');
+  assert.equal(SUPPORT_EMAIL, 'simonethg@changuito.me');
 });
 
 test('the in-app privacy page links to the published policy and the deletion page', () => {
