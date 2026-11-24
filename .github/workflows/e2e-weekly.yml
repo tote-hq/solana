@@ -18,7 +18,8 @@ concurrency:
 jobs:
   smoke:
     name: Read-only smoke (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Playwright 1.55.1 has no Chromium build for it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
