@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [landing, shell]
+        project: [shell]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
