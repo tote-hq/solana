@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { APP } from './support/app-copy';
 import { collectPageErrors, expectNoPageErrors } from './support/page-errors';
+import { assertNoThreadError } from './support/thread-health';
 import { POLLAR } from './support/pollar-copy';
 
 const STARTER = 'Compará precios de leche con proteína';
@@ -73,6 +74,7 @@ test.describe('app guest', () => {
         await page.getByTestId('composer-send').click();
         await expect(page.getByTestId('chat-thread').getByText(prompt)).toBeVisible();
       }
+      await assertNoThreadError(page);
     } else {
       await expect(verification).toBeVisible();
       await expect(page.getByTestId('human-gate')).toBeVisible();

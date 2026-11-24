@@ -1,0 +1,126 @@
+# Monday 05:00 in America/Argentina/Buenos_Aires (UTC-3, no DST) is 08:00 UTC.
+# The smoke is read-only and targets sol.changuito.me. The escrow tests run
+# in LiteSVM after an SBF build. They do not talk to devnet.
+name: Weekly E2E
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-weekly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Read-only smoke (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [landing, shell]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node from .nvmrc
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright smoke
+        id: tests
+        run: |
+          set +e
+          start=$(date +%s)
+          npx playwright test --project=${{ matrix.project }} --grep-invert @quarantine
+          code=$?
+          end=$(date +%s)
+          echo "seconds=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$code"
+        env:
+          CI: true
+          LANDING_BASE_URL: https://www.changuito.me
+          APP_BASE_URL: https://sol.changuito.me
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Read-only ${{ matrix.project }}"
+            echo "Playwright finished in ${{ steps.tests.outputs.seconds }}s (this step only)."
+            echo "Result: ${{ steps.tests.outcome }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-smoke-${{ matrix.project }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  litesvm:
+    name: Escrow LiteSVM
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: anchor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: anchor
+
+      - name: Install Solana CLI 4.3.0
+        working-directory: ${{ github.workspace }}
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v4.3.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build SBF and run ignored tests
+        id: tests
+        run: |
+          set +e
+          start=$(date +%s)
+          cargo build-sbf
+          build=$?
+          if [ "$build" -eq 0 ]; then
+            cargo test --manifest-path programs/changuito_escrow/Cargo.toml -- --ignored
+            build=$?
+          fi
+          end=$(date +%s)
+          echo "seconds=$((end - start))" >> "$GITHUB_OUTPUT"
+          exit "$build"
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Escrow LiteSVM"
+            echo "SBF build plus ignored tests finished in ${{ steps.tests.outputs.seconds }}s (this step only)."
+            echo "Result: ${{ steps.tests.outcome }}"
+            echo "This job does not call devnet."
+          } >> "$GITHUB_STEP_SUMMARY"
