@@ -15,8 +15,8 @@
 export const APP = {
   /**
    * The preview masthead's door into production, `PREVIEW_MASTHEAD.action` in
-   * apps/web/lib/mode-copy.ts. It opens the Pollar login modal under either
-   * label; only the wording changed.
+   * apps/web/lib/mode-copy.ts. The Solana shopper says "Iniciar sesión".
+   * Older builds said "Empezá a comprar" or "Cambiar a modo real".
    */
-  loginAction: /^(Empezá a comprar|Cambiar a modo real)$/,
+  loginAction: /^(Empezá a comprar|Cambiar a modo real|Iniciar sesión|Sign in)$/,
 } as const;

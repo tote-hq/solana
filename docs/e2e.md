@@ -77,7 +77,15 @@ Two workflows. They do not share a trigger.
 | `.github/workflows/e2e.yml` | A **merge to `main`** whose diff touches a backend path, or **Actions → E2E → Run workflow**. |
 
 E2E does not run on pull requests, and it does not run on a push that only
-touches the UI, docs, or the specs themselves. There is no schedule.
+touches the UI, docs, or the specs themselves.
+
+`.github/workflows/e2e-weekly.yml` is the schedule: Monday at 05:00 in
+America/Argentina/Buenos_Aires (`0 8 * * 1` UTC), and `workflow_dispatch`.
+It runs the read-only `shell` project and the LiteSVM escrow tests. It does
+not run `landing`. Cloudflare's interactive challenge blocks the GitHub
+runner on www.changuito.me, so a weekly landing smoke cannot see the page.
+`e2e/landing.spec.ts` stays in the repo and still runs when you ask for that
+project locally or from the manual E2E workflow.
 
 A backend merge runs the two smokes (`landing` and `app`). A manual run asks
 which suite: `landing`, `app` or `both` (the default). The workflow still
