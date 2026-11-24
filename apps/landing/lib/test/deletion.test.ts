@@ -17,7 +17,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 test('account deletion pages exist in both languages and name the support address', () => {
-  assert.equal(SUPPORT_EMAIL, 'contact@simonethg.com');
+  assert.equal(SUPPORT_EMAIL, 'simonethg@changuito.me');
   assert.equal(SUPPORT_FOOTER_LINK.label, SUPPORT_EMAIL);
   assert.equal(SUPPORT_FOOTER_LINK.href, `mailto:${SUPPORT_EMAIL}`);
   assert.deepEqual(
