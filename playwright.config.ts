@@ -5,7 +5,7 @@ import { loadLocalEnv } from './e2e/support/env';
 loadLocalEnv();
 
 const landingBaseURL = process.env.LANDING_BASE_URL?.trim() || 'https://www.changuito.me';
-const appBaseURL = process.env.APP_BASE_URL?.trim() || 'https://app.changuito.me';
+const appBaseURL = process.env.APP_BASE_URL?.trim() || 'https://sol.changuito.me';
 
 /**
  * The checkout spec is the one that cannot run against a deployment.
@@ -41,6 +41,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
+  grepInvert: /@quarantine/,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
   timeout: 60_000,
@@ -48,6 +49,7 @@ export default defineConfig({
   reporter: process.env.CI
     ? [
         ['html', { open: 'never' }],
+        ['junit', { outputFile: 'test-results/e2e-junit.xml' }],
         ['github'],
         ['list'],
       ]
@@ -89,7 +91,12 @@ export default defineConfig({
       // `app-` spec by name so it sits with its siblings, but it is the one
       // that needs a server of its own, and a production run of it would
       // frame a real supermarket.
-      testIgnore: /app-frame-checkout\.spec\.ts/,
+      testIgnore: [/app-frame-checkout\.spec\.ts/, /app-shell\.spec\.ts/],
+      use: { ...devices['Desktop Chrome'], baseURL: appBaseURL },
+    },
+    {
+      name: 'shell',
+      testMatch: /app-shell\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: appBaseURL },
     },
     {

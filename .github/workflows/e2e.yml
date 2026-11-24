@@ -1,9 +1,9 @@
 # Playwright.
 #
 # Automatic runs: a push to main (a merge) whose diff touches a backend path
-# below. That run always executes both the landing project and the app project.
-# Anything else, including pull requests and frontend-only pushes, does not
-# start this workflow. Use workflow_dispatch and pick a suite.
+# below. That run executes the landing project and the read-only shell against
+# sol.changuito.me. It does not send a chat turn. Use workflow_dispatch and
+# pick `app` only when you mean the guest turn. Pull requests do not start this.
 #
 # `landing` and `app` are smokes against production. `checkout` (currently
 # removed: no specs in the Solana build yet) is not: it is
@@ -84,6 +84,7 @@ on:
         options:
           - both
           - landing
+          - shell
           - app
           # `checkout` was removed: the Solana build has no checkout specs yet
           # ("No tests found"). Re-add the option and the matrix branch below
@@ -116,7 +117,8 @@ jobs:
           ${{ fromJSON(
             github.event.inputs.suite == 'landing' && '["landing"]' ||
             github.event.inputs.suite == 'app' && '["app"]' ||
-            '["landing","app"]') }}
+            github.event.inputs.suite == 'shell' && '["shell"]' ||
+            '["landing","shell"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -138,7 +140,7 @@ jobs:
         env:
           CI: true
           LANDING_BASE_URL: https://www.changuito.me
-          APP_BASE_URL: https://app.changuito.me
+          APP_BASE_URL: https://sol.changuito.me
           CHANGUTO_E2E_EMAIL: ${{ secrets.CHANGUTO_E2E_EMAIL }}
           CHANGUTO_E2E_PASSWORD: ${{ secrets.CHANGUTO_E2E_PASSWORD }}
           CHANGUTO_E2E_OTP: ${{ secrets.CHANGUTO_E2E_OTP }}
